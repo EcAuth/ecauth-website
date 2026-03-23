@@ -42,4 +42,5 @@ jobs:
         with:
           apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          packageManager: npm
           command: pages deploy public --project-name=ecauth-website
