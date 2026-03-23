@@ -1,0 +1,52 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ .Title }}</title>
+<meta name="description" content="{{ .Site.Params.description }}">
+
+<!-- OGP -->
+<meta property="og:title" content="{{ .Title }}">
+<meta property="og:description" content="{{ .Site.Params.description }}">
+<meta property="og:type" content="website">
+<meta property="og:url" content="{{ .Permalink }}">
+{{ with .Site.Params.ogImage }}<meta property="og:image" content="{{ . | absURL }}">{{ end }}
+<meta property="og:locale" content="ja_JP">
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{ .Title }}">
+<meta name="twitter:description" content="{{ .Site.Params.description }}">
+
+<!-- JSON-LD -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "name": "EcAuth",
+      "url": "https://ec-auth.io",
+      "description": "{{ .Site.Params.description }}"
+    },
+    {
+      "@type": "WebSite",
+      "name": "EcAuth",
+      "url": "https://ec-auth.io"
+    },
+    {
+      "@type": "SoftwareApplication",
+      "name": "EcAuth EC-CUBEプラグイン",
+      "applicationCategory": "SecurityApplication",
+      "operatingSystem": "Web",
+      "description": "EC-CUBE管理画面にパスキー認証（WebAuthn/FIDO2）を導入するプラグイン",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "JPY",
+        "description": "プラグイン自体は無料。5ユーザーまで無料、6ユーザー以上は100円/ユーザー/月。"
+      }
+    }
+  ]
+}
+</script>
+
+<link rel="stylesheet" href="/css/style.css">

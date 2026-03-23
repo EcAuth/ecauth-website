@@ -1,0 +1,54 @@
+# EcAuth
+
+> EC-CUBE向けパスキー認証・ソーシャルログイン Identity Providerサービス
+
+## サービス概要
+
+EcAuthは、EC-CUBEにパスキー認証やソーシャルログインを導入するIdentity Providerサービスです。フィッシング攻撃から管理画面を保護し、パスワードに代わる安全な認証を提供します。
+
+## ロードマップ
+
+### Phase 1: B2Bパスキー認証（管理画面向け）- MVP
+- WebAuthn/FIDO2準拠のパスキー認証
+- EC-CUBE管理画面（管理者・スタッフ）が対象
+- Touch ID、Windows Hello、セキュリティキーに対応
+- RP ID（ドメイン）検証によるフィッシング耐性
+
+### Phase 2: B2Cパスキー認証（フロント向け）
+- ECサイトフロント向けパスキー認証
+- エンドユーザー（顧客）が対象
+
+### Phase 3: ソーシャルログイン（外部IdP連携）
+- OpenID Connect Authorization Code Flow
+- 外部IdP連携: Google、LINE、Facebook等
+- JIT（Just-In-Time）プロビジョニング
+
+### Phase 4: 企業SSO
+- Azure Entra ID連携
+- Google Workspace連携
+
+## 対応プラットフォーム
+
+- EC-CUBE 4系（優先）
+- EC-CUBE 2系
+
+## 導入方法
+
+1. EC-CUBEプラグイン（無料）をインストール
+2. EcAuthに申し込み（Organization作成）
+3. プラグイン設定画面でClient ID/Secretを入力
+4. 管理画面にパスキーログインボタンが表示される
+
+## 技術スタック
+
+- バックエンド: .NET 9.0 / ASP.NET Core
+- データベース: Microsoft SQL Server / Azure SQL Database
+- WebAuthn: Fido2.NetLib
+- インフラ: Azure Web Apps
+
+## リンク
+
+- ウェブサイト: https://ec-auth.io
+- GitHub: https://github.com/EcAuth
+- EC-CUBE 4系プラグイン: https://github.com/EcAuth/ec-cube4-ecauth
+- EC-CUBE 2系プラグイン: https://github.com/EcAuth/ec-cube2-ecauth

@@ -1,0 +1,44 @@
+{{ define "main" }}
+<section class="hero">
+  <h1>EC-CUBE管理画面を<br>パスキーで守る</h1>
+  <p class="tagline">フィッシング対策認証を、プラグインひとつで。</p>
+</section>
+
+<section class="features">
+  {{ .Content }}
+</section>
+
+<section class="roadmap">
+  <h2>今後の予定</h2>
+  <ul class="roadmap-list">
+    <li class="roadmap-item current">
+      <span class="roadmap-label">Phase 1</span>
+      <strong>B2B パスキー認証</strong>
+      <p>EC-CUBE管理画面向けパスキー認証（WebAuthn/FIDO2）</p>
+    </li>
+    <li class="roadmap-item">
+      <span class="roadmap-label">Phase 2</span>
+      <strong>B2C パスキー認証</strong>
+      <p>ECサイトフロント向けパスキー認証</p>
+    </li>
+    <li class="roadmap-item">
+      <span class="roadmap-label">Phase 3</span>
+      <strong>ソーシャルログイン</strong>
+      <p>Google、LINE、Facebook等の外部IdP連携</p>
+    </li>
+    <li class="roadmap-item">
+      <span class="roadmap-label">Phase 4</span>
+      <strong>企業SSO</strong>
+      <p>Azure Entra ID、Google Workspace連携</p>
+    </li>
+  </ul>
+</section>
+
+<section class="coming-soon">
+  <div class="badge">Coming Soon</div>
+  <p>サービス準備中です。リリースまでしばらくお待ちください。</p>
+  <a href="https://github.com/EcAuth" class="github-link">
+    GitHub で開発状況を確認する &rarr;
+  </a>
+</section>
+{{ end }}

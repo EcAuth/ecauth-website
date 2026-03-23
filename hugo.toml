@@ -1,0 +1,18 @@
+baseURL = "https://ec-auth.io/"
+languageCode = "ja"
+title = "EcAuth - EC-CUBE向けパスキー認証サービス"
+
+disableKinds = ["taxonomy", "term"]
+
+[params]
+  description = "EC-CUBE管理画面のセキュリティを強化するパスキー認証サービス。5ユーザーまで無料。"
+  ogImage = "/images/og-image.png"
+
+[markup.goldmark.renderer]
+  unsafe = true
+
+enableRobotsTXT = true
+
+[sitemap]
+  changeFreq = "weekly"
+  priority = 0.5
