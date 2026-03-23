@@ -14,7 +14,7 @@ jobs:
       deployments: write
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Load secrets from 1Password
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
