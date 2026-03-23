@@ -12,8 +12,19 @@ jobs:
     permissions:
       contents: read
       deployments: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
+
+      - name: Load secrets from 1Password
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: 1password/load-secrets-action@v3
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          CLOUDFLARE_API_TOKEN: op://EcAuth/cloudflare-credentials/CLOUDFLARE_API_TOKEN
+          CLOUDFLARE_ACCOUNT_ID: op://EcAuth/cloudflare-credentials/CLOUDFLARE_ACCOUNT_ID
 
       - name: Setup Hugo
         uses: peaceiris/actions-hugo@v3
@@ -28,6 +39,6 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: cloudflare/wrangler-action@v3
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy public --project-name=ecauth-website
