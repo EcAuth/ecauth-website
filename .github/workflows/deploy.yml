@@ -15,11 +15,11 @@ jobs:
       deployments: write
       id-token: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Load secrets from 1Password
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: 1password/load-secrets-action@v3
+        uses: 1password/load-secrets-action@dafbe7cb03502b260e2b2893c753c352eee545bf # v3.2.1
         with:
           export-env: true
         env:
@@ -28,7 +28,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: op://EcAuth/cloudflare-credentials/CLOUDFLARE_ACCOUNT_ID
 
       - name: Setup Hugo
-        uses: peaceiris/actions-hugo@v3
+        uses: peaceiris/actions-hugo@75d2e84710de30f6ff7268e08f310b60ef14033f # v3.0.0
         with:
           hugo-version: 'latest'
           extended: true
@@ -38,7 +38,7 @@ jobs:
 
       - name: Deploy to Cloudflare Pages
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd # v3.15.0
         with:
           apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
