@@ -16,3 +16,11 @@ updates:
     commit-message:
       prefix: "chore"
       include: "scope"
+    # 公式 actions/* を 1 PR に集約（major は個別 PR を維持）
+    groups:
+      actions-minor-patch:
+        patterns:
+          - "actions/*"
+        update-types:
+          - "minor"
+          - "patch"
