@@ -7,6 +7,16 @@ disableKinds = ["taxonomy", "term"]
 [params]
   description = "EC-CUBE管理画面のセキュリティを強化するパスキー認証サービス。5ユーザーまで無料。"
   ogImage = "/images/og-image.png"
+  # マイページ／申込フォームが叩く EcAuth 認証 API のベース URL。
+  # 本番 = accounts.ec-auth.io / stg = deploy.yml の HUGO_PARAMS_APIBASEURL で上書き。
+  # 生 Azure URL はここに書かない。
+  apiBaseUrl = "https://accounts.ec-auth.io"
+  # マイページが OAuth2(PKCE) public client として使う client_id（accounts の管理コンソール）。
+  adminClientId = "ecauth-admin-console"
+  # OAuth2 の redirect_uri（登録値と完全一致させる固定文字列。末尾スラッシュ有無に注意）。
+  # 認可リクエストとトークン交換の両方でこの値を使い、アドレスバーの実 URL には依存させない。
+  # ローカルは deploy/実行時に HUGO_PARAMS_AUTHREDIRECTURI で上書きする。
+  authRedirectUri = "https://ec-auth.io/auth/callback"
 
 [markup.goldmark.renderer]
   unsafe = true

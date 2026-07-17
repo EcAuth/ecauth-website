@@ -1,0 +1,36 @@
+{{ define "main" }}
+<div class="app-main wide">
+  <!-- 読み込み中 -->
+  <div id="loading" class="app-card center"><span class="spinner"></span> 読み込み中…</div>
+
+  <!-- 未認証: パスキーログイン導線 -->
+  <div id="login-view" class="app-card" style="display:none">
+    <h1 class="app-title">マイページ</h1>
+    <p class="app-lead">パスキー（指紋・顔認証・PIN 等）でログインしてください。</p>
+    <button type="button" class="btn primary block" id="login-btn">🔑 パスキーでログイン</button>
+    <div class="status" id="login-status" role="status" aria-live="polite"></div>
+    <p class="center mt-2"><a class="muted-link" href="/signin/">パスキーが使えない方はこちら</a></p>
+  </div>
+
+  <!-- 認証済: Client 一覧 -->
+  <div id="app-view" style="display:none">
+    <div class="app-card">
+      <h1 class="app-title">Client 情報</h1>
+      <p class="app-lead">EC-CUBE プラグインに設定する Client ID / Client Secret です。<strong>本番サイト</strong>と<strong>テストサイト</strong>で別々に設定してください。</p>
+      <div id="clients"></div>
+      <div class="status" id="list-status" role="status" aria-live="polite"></div>
+    </div>
+    <div class="app-card next-step">
+      <h3>次のステップ</h3>
+      <p class="app-lead" style="margin:0">EC-CUBE 管理画面の「EcAuth 設定」に、上記の Client ID / Client Secret を入力してください。設定後、管理者用パスキーの登録に進めます。</p>
+    </div>
+    <p class="center mt-2"><a class="muted-link" href="#" id="logout-link">ログアウト</a></p>
+  </div>
+</div>
+{{ end }}
+
+{{ define "scripts" }}
+<script src="/js/app.js"></script>
+<script src="/js/pkce.js"></script>
+<script src="/js/mypage.js"></script>
+{{ end }}
