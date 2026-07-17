@@ -5,6 +5,16 @@
   var statusEl = App.$('#status');
   var btn = App.$('#login-btn');
 
+  // 遷移先が自オリジンの絶対 URL のときのみ返す。それ以外は null（オープンリダイレクト対策）。
+  function sameOriginUrl(value) {
+    try {
+      var u = new URL(value, window.location.origin);
+      return u.origin === window.location.origin ? u.href : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   var token = App.queryParam('token');
   if (!token) {
     btn.disabled = true;
@@ -28,9 +38,15 @@
     }
 
     if (res.ok && res.data && res.data.location) {
-      // マジックリンクは PKCE を伴わない。callback 側は verifier 非依存で code を交換する。
+      // オープンリダイレクト対策: 遷移先は自サイト（ec-auth.io）内に限定する。
+      // サーバ返却値でも、同一オリジンの絶対 URL 以外へは遷移しない。
+      var dest = sameOriginUrl(res.data.location);
+      if (!dest) {
+        App.setStatus(statusEl, 'err', '不正な遷移先が返されました。お手数ですが最初からやり直してください。');
+        return;
+      }
       App.setStatus(statusEl, 'ok', 'ログインに成功しました。移動しています…');
-      window.location.href = res.data.location;
+      window.location.href = dest;
       return;
     }
 

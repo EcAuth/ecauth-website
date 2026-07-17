@@ -8,6 +8,13 @@
   var cfg = window.ECAUTH || {};
   var AT_KEY = 'ecauth_at';
   var VERIFIER_KEY = 'ecauth_pkce_verifier';
+  var STATE_KEY = 'ecauth_oauth_state';
+
+  function randomState() {
+    var a = new Uint8Array(16);
+    crypto.getRandomValues(a);
+    return Array.prototype.map.call(a, function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
+  }
 
   var loading = App.$('#loading');
   var loginView = App.$('#login-view');
@@ -26,13 +33,17 @@
     btn.disabled = true;
     try {
       var pkce = await window.EcAuthPkce.create();
+      var state = randomState();
       sessionStorage.setItem(VERIFIER_KEY, pkce.verifier);
+      sessionStorage.setItem(STATE_KEY, state);
       var q = new URLSearchParams({
         client_id: cfg.adminClientId || '',
         redirect_uri: cfg.authRedirectUri || '',
         response_type: 'code',
         code_challenge: pkce.challenge,
-        code_challenge_method: 'S256'
+        code_challenge_method: 'S256',
+        // CSRF / 認可コード注入対策。callback で保存値と一致検証する。
+        state: state
       });
       // accounts オリジンのパスキー認証ページ（RP ID=accounts）へ遷移
       window.location.href = apiBase() + '/passkey/authenticate?' + q.toString();

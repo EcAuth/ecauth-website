@@ -1,8 +1,11 @@
 /*
- * OAuth2 コールバック: ?code= を /v1/token で交換してアクセストークンを取得。
- * - パスキー経路: sessionStorage の code_verifier を付けて PKCE 交換。
- * - マジックリンク経路: verifier が無い（サーバが code を発行）。verifier 無しで交換する。
- * トークン取得後はマイページへ遷移する。
+ * OAuth2 コールバック（パスキー経路 / PKCE）: ?code= を /v1/token で交換。
+ * セキュリティ上、この経路は必ず PKCE(code_verifier) + state を要求する。
+ *   - state: mypage で保存した値と一致検証（CSRF / 認可コード注入対策）。
+ *   - code_verifier: 必須。欠落時は交換せずエラー（PKCE ダウングレード防止）。
+ * マジックリンク（リカバリ）は verifier を持てず本経路と衝突するため、backend 側で
+ * 「verify がトークンを直接返す」等の対応が入るまで本 callback は使わない前提
+ * （設計メモ: マジックリンク×PKCE 衝突）。
  */
 (function () {
   'use strict';
@@ -10,6 +13,7 @@
   var cfg = window.ECAUTH || {};
   var AT_KEY = 'ecauth_at';
   var VERIFIER_KEY = 'ecauth_pkce_verifier';
+  var STATE_KEY = 'ecauth_oauth_state';
 
   var statusEl = App.$('#status');
   var msgEl = App.$('#cb-message');
@@ -25,6 +29,13 @@
 
   var error = App.queryParam('error');
   var code = App.queryParam('code');
+  var returnedState = App.queryParam('state');
+
+  var expectedState = sessionStorage.getItem(STATE_KEY);
+  var verifier = sessionStorage.getItem(VERIFIER_KEY);
+  // 使い捨て: 検証用に取り出したら即破棄する（再利用・残留を防ぐ）
+  sessionStorage.removeItem(STATE_KEY);
+  sessionStorage.removeItem(VERIFIER_KEY);
 
   if (error) {
     fail('ログインがキャンセルされたか、エラーが発生しました（' + error + '）。');
@@ -34,15 +45,24 @@
     fail('認可コードがありません。お手数ですが最初からやり直してください。');
     return;
   }
+  // state 検証（CSRF / 認可コード注入対策）。開始時の値と一致しなければ中断。
+  if (!expectedState || returnedState !== expectedState) {
+    fail('セッションが確認できませんでした。お手数ですが最初からやり直してください。');
+    return;
+  }
+  // PKCE 必須（ダウングレード防止）。verifier が無ければ交換しない。
+  if (!verifier) {
+    fail('ログインセッションが確認できませんでした。マイページから再度ログインしてください。');
+    return;
+  }
 
   (async function () {
-    var verifier = sessionStorage.getItem(VERIFIER_KEY);
     var body = new URLSearchParams();
     body.set('grant_type', 'authorization_code');
     body.set('code', code);
     body.set('redirect_uri', cfg.authRedirectUri || '');
     body.set('client_id', cfg.adminClientId || '');
-    if (verifier) body.set('code_verifier', verifier);
+    body.set('code_verifier', verifier);
 
     var res, data = null;
     try {
@@ -56,9 +76,6 @@
       fail('ネットワークエラーが発生しました。時間をおいて再度お試しください。');
       return;
     }
-
-    // 使い終わった verifier は必ず破棄
-    sessionStorage.removeItem(VERIFIER_KEY);
 
     if (res.ok && data && data.access_token) {
       sessionStorage.setItem(AT_KEY, data.access_token);
