@@ -9,6 +9,7 @@
 
   var token = App.queryParam('token');
   var confirmedEmail = null;
+  var registrationToken = null;
 
   if (!token) {
     btn.disabled = true;
@@ -33,8 +34,13 @@
 
     if (res.ok && res.data) {
       confirmedEmail = res.data.email || null;
+      registrationToken = res.data.registration_token || null;
       btn.style.display = 'none';
       App.setStatus(statusEl, 'ok', (res.data.message || '申込を確定しました。') + (confirmedEmail ? '（' + confirmedEmail + '）' : ''));
+      if (!registrationToken) {
+        App.setStatus(statusEl, 'err', '登録トークンを取得できませんでした。お手数ですが再度お申し込みください。');
+        return;
+      }
       nextStep.style.display = 'block';
       return;
     }
@@ -45,11 +51,14 @@
   });
 
   // パスキー登録は accounts オリジン（RP ID=accounts.ec-auth.io）で行う。
-  // 確定したメールを引き継ぎ、accounts のパスキー登録ページへ遷移する。
+  // 登録トークン・client_id・メールを引き継ぎ、accounts のパスキー登録ページへ遷移する。
   passkeyBtn.addEventListener('click', function () {
-    var base = (window.ECAUTH && window.ECAUTH.apiBaseUrl || '').replace(/\/$/, '');
-    var url = base + '/passkey/register';
-    if (confirmedEmail) url += '?email=' + encodeURIComponent(confirmedEmail);
-    window.location.href = url;
+    var cfg = window.ECAUTH || {};
+    var base = (cfg.apiBaseUrl || '').replace(/\/$/, '');
+    var q = new URLSearchParams();
+    q.set('token', registrationToken || '');
+    q.set('client_id', cfg.adminClientId || '');
+    if (confirmedEmail) q.set('email', confirmedEmail);
+    window.location.href = base + '/passkey/register?' + q.toString();
   });
 })();
