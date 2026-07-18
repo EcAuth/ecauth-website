@@ -1,19 +1,17 @@
-/* マジックリンク着地: ?token= をユーザー操作で POST verify → 返却 location へ遷移 */
+/*
+ * マジックリンク着地: ?token= をユーザー操作で POST verify → 返却されたトークンでマイページへ。
+ *
+ * verify は認可コードではなくアクセストークンを直接返す。マイページ（管理コンソール）は
+ * public client であり /v1/token は PKCE(code_verifier) を必須とするが、マジックリンクは
+ * メール往復（別端末・別ブラウザもあり得る）のため verifier を着地側と紐づけられない。
+ * よってリカバリ経路では認可コードを介さず、/auth/callback も経由しない。
+ */
 (function () {
   'use strict';
   var App = window.EcAuthApp;
+  var AT_KEY = 'ecauth_at';
   var statusEl = App.$('#status');
   var btn = App.$('#login-btn');
-
-  // 遷移先が自オリジンの絶対 URL のときのみ返す。それ以外は null（オープンリダイレクト対策）。
-  function sameOriginUrl(value) {
-    try {
-      var u = new URL(value, window.location.origin);
-      return u.origin === window.location.origin ? u.href : null;
-    } catch (e) {
-      return null;
-    }
-  }
 
   var token = App.queryParam('token');
   if (!token) {
@@ -37,16 +35,12 @@
       return;
     }
 
-    if (res.ok && res.data && res.data.location) {
-      // オープンリダイレクト対策: 遷移先は自サイト（ec-auth.io）内に限定する。
-      // サーバ返却値でも、同一オリジンの絶対 URL 以外へは遷移しない。
-      var dest = sameOriginUrl(res.data.location);
-      if (!dest) {
-        App.setStatus(statusEl, 'err', '不正な遷移先が返されました。お手数ですが最初からやり直してください。');
-        return;
-      }
+    if (res.ok && res.data && res.data.access_token) {
+      // マイページと同じ保管場所・同じキーに置く（/auth/callback 経由と等価な状態にする）。
+      sessionStorage.setItem(AT_KEY, res.data.access_token);
       App.setStatus(statusEl, 'ok', 'ログインに成功しました。移動しています…');
-      window.location.href = dest;
+      // replace: 戻る操作で消費済みトークンの URL に戻らせない。
+      window.location.replace('/mypage/');
       return;
     }
 

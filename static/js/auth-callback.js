@@ -3,9 +3,9 @@
  * セキュリティ上、この経路は必ず PKCE(code_verifier) + state を要求する。
  *   - state: mypage で保存した値と一致検証（CSRF / 認可コード注入対策）。
  *   - code_verifier: 必須。欠落時は交換せずエラー（PKCE ダウングレード防止）。
- * マジックリンク（リカバリ）は verifier を持てず本経路と衝突するため、backend 側で
- * 「verify がトークンを直接返す」等の対応が入るまで本 callback は使わない前提
- * （設計メモ: マジックリンク×PKCE 衝突）。
+ * マジックリンク（リカバリ）は verifier を持てず本経路と衝突するため、backend 側の
+ * /api/account/magic-link/verify がトークンを直接返す。よってリカバリ経路は本 callback を
+ * 経由しない（signin-magic-link.js 参照）。ここは常にパスキー経路のみを扱う。
  */
 (function () {
   'use strict';
