@@ -56,9 +56,12 @@
     var cfg = window.ECAUTH || {};
     var base = (cfg.apiBaseUrl || '').replace(/\/$/, '');
     var q = new URLSearchParams();
-    q.set('token', registrationToken || '');
     q.set('client_id', cfg.adminClientId || '');
     if (confirmedEmail) q.set('email', confirmedEmail);
-    window.location.href = base + '/passkey/register?' + q.toString();
+    // 登録トークンは URL フラグメントで渡す。フラグメントはサーバへ送信されないため、
+    // アクセスログ / Azure Monitor(requests.url) / Referer にトークンが残らない。
+    var frag = new URLSearchParams();
+    frag.set('token', registrationToken || '');
+    window.location.href = base + '/passkey/register?' + q.toString() + '#' + frag.toString();
   });
 })();
