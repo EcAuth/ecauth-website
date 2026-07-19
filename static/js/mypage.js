@@ -7,6 +7,7 @@
   var App = window.EcAuthApp;
   var cfg = window.ECAUTH || {};
   var AT_KEY = 'ecauth_at';
+  var MASK = '••••••••••••••••';
   var VERIFIER_KEY = 'ecauth_pkce_verifier';
   var STATE_KEY = 'ecauth_oauth_state';
 
@@ -67,23 +68,10 @@
     return n;
   }
 
-  function makeCodeRow(labelText, value, opts) {
-    opts = opts || {};
+  function makeCodeRow(labelText, value) {
     var row = el('div', 'secret-row');
     row.appendChild(el('span', 'label', labelText));
-    var code = el('code', null, opts.masked ? maskValue(value) : value);
-    row.appendChild(code);
-
-    if (opts.masked) {
-      var toggle = el('button', 'icon-btn', '表示');
-      var revealed = false;
-      toggle.addEventListener('click', function () {
-        revealed = !revealed;
-        code.textContent = revealed ? value : maskValue(value);
-        toggle.textContent = revealed ? '隠す' : '表示';
-      });
-      row.appendChild(toggle);
-    }
+    row.appendChild(el('code', null, value));
 
     var copy = el('button', 'icon-btn', 'コピー');
     copy.addEventListener('click', async function () {
@@ -92,18 +80,81 @@
       setTimeout(function () { copy.textContent = 'コピー'; }, 1500);
     });
     row.appendChild(copy);
-
-    if (opts.onRegenerate) {
-      var regen = el('button', 'icon-btn', '再生成');
-      regen.addEventListener('click', function () { opts.onRegenerate(code, regen); });
-      row.appendChild(regen);
-    }
     return row;
   }
 
-  function maskValue(v) {
-    if (!v) return '（未設定）';
-    return v.slice(0, 6) + '••••••••••••';
+  /*
+   * Client Secret 行。
+   * 一覧 API（GET /v1/account/clients）は secret 値を返さないため、
+   * 「表示」/「コピー」の操作時に初めて POST .../secret/reveal で 1 件だけ取得する。
+   * 取得済みの値はこの行のクロージャにのみ保持し、DOM 上は既定でマスク表示のままにする。
+   */
+  function makeSecretRow(client) {
+    var secret = null;      // reveal 済みの平文（未取得なら null）
+    var revealed = false;
+
+    var row = el('div', 'secret-row');
+    row.appendChild(el('span', 'label', 'Client Secret'));
+    var code = el('code', null, client.has_secret ? MASK : '（未設定）');
+    row.appendChild(code);
+
+    function render() {
+      code.textContent = !client.has_secret ? '（未設定）'
+        : (revealed && secret) ? secret : MASK;
+      toggle.textContent = revealed ? '隠す' : '表示';
+    }
+
+    // 未取得なら reveal API で取得する。取得できたら平文を返す。
+    async function ensureSecret(btn) {
+      if (secret != null) return secret;
+      var original = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = '取得中…';
+      var res = await authFetch('POST', '/v1/account/clients/' + encodeURIComponent(client.id) + '/secret/reveal');
+      btn.disabled = false;
+      btn.textContent = original;
+      if (res && res.ok && res.data && typeof res.data.client_secret === 'string') {
+        secret = res.data.client_secret;
+        return secret;
+      }
+      if (res && res.status === 401) { requireLogin(); return null; }
+      App.setStatus(listStatus, 'err', 'Client Secret を取得できませんでした。時間をおいて再度お試しください。');
+      return null;
+    }
+
+    var toggle = el('button', 'icon-btn', '表示');
+    toggle.addEventListener('click', async function () {
+      if (!client.has_secret) return;
+      if (revealed) { revealed = false; render(); return; }
+      if (await ensureSecret(toggle) == null) return;
+      revealed = true;
+      render();
+    });
+    row.appendChild(toggle);
+
+    var copy = el('button', 'icon-btn', 'コピー');
+    copy.addEventListener('click', async function () {
+      if (!client.has_secret) return;
+      var value = await ensureSecret(copy);
+      if (value == null) return;
+      var ok = await App.copyText(value);
+      copy.textContent = ok ? 'コピー済' : '失敗';
+      setTimeout(function () { copy.textContent = 'コピー'; }, 1500);
+    });
+    row.appendChild(copy);
+
+    var regen = el('button', 'icon-btn', '再生成');
+    regen.addEventListener('click', function () {
+      regenerateSecret(client, regen, function (newSecret) {
+        secret = newSecret;
+        revealed = true;          // 生成直後は控えてもらうため全表示にする
+        client.has_secret = true;
+        render();
+      });
+    });
+    row.appendChild(regen);
+
+    return row;
   }
 
   function renderClients(clients) {
@@ -121,17 +172,14 @@
       item.appendChild(name);
       if (c.organization_code) item.appendChild(el('div', 'ci-domain', c.organization_code));
 
-      item.appendChild(makeCodeRow('Client ID', c.client_id, {}));
-      item.appendChild(makeCodeRow('Client Secret', c.client_secret, {
-        masked: true,
-        onRegenerate: function (codeEl, regenBtn) { regenerateSecret(c, codeEl, regenBtn); }
-      }));
+      item.appendChild(makeCodeRow('Client ID', c.client_id));
+      item.appendChild(makeSecretRow(c));
 
       clientsEl.appendChild(item);
     });
   }
 
-  async function regenerateSecret(client, codeEl, regenBtn) {
+  async function regenerateSecret(client, regenBtn, onSuccess) {
     if (!global_confirm('Client Secret を再生成します。既存の値は無効になり、EC-CUBE プラグインへの再設定が必要です。よろしいですか？')) return;
     regenBtn.disabled = true;
     var original = regenBtn.textContent;
@@ -140,8 +188,7 @@
     regenBtn.disabled = false;
     regenBtn.textContent = original;
     if (res && res.ok && res.data && res.data.client_secret) {
-      client.client_secret = res.data.client_secret;
-      codeEl.textContent = res.data.client_secret; // 生成直後は全表示
+      onSuccess(res.data.client_secret);
       App.setStatus(listStatus, 'ok', 'Client Secret を再生成しました。EC-CUBE プラグインに再設定してください。');
     } else if (res && res.status === 401) {
       requireLogin();
