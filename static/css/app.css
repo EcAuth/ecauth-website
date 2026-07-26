@@ -1,0 +1,155 @@
+/*
+ * app.css — 申込フォーム / マイページ等の「アプリ」ページ専用スタイル。
+ * head.html で .Params.appPage のページにのみ読み込む。
+ * 既存 style.css のデザイントークン（var(--color-*)）を踏襲しつつ、
+ * app ページに限りダークモードへ対応する。
+ */
+
+/* app ページのみダークモード対応（マーケティングページ style.css はライト固定のまま） */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-text: #e5e7eb;
+    --color-text-light: #9ca3af;
+    --color-bg: #0f172a;
+    --color-bg-light: #1e293b;
+    --color-border: #334155;
+  }
+  body { background: var(--color-bg); color: var(--color-text); }
+}
+
+.app-main {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 3rem 1.25rem 4rem;
+}
+.app-main.wide { max-width: 860px; }
+
+.app-card {
+  background: var(--color-bg-light);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 2rem;
+}
+.app-card + .app-card { margin-top: 1.25rem; }
+
+.app-title { font-size: 1.5rem; font-weight: 700; margin: 0 0 .5rem; }
+.app-lead { color: var(--color-text-light); margin: 0 0 1.5rem; line-height: 1.7; }
+
+/* --- フォーム --- */
+.field { margin-bottom: 1.25rem; }
+.field label { display: block; font-weight: 600; margin-bottom: .4rem; }
+.field .opt, .field .req { font-weight: 400; font-size: .85em; }
+.field .opt { color: var(--color-text-light); }
+.field .req { color: #dc2626; }
+.field input, .field select {
+  width: 100%;
+  padding: .7rem .85rem;
+  font-size: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  box-sizing: border-box;
+}
+.field input:focus, .field select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(26, 86, 219, .15);
+}
+.field .hint { font-size: .85rem; color: var(--color-text-light); margin-top: .35rem; line-height: 1.5; }
+.field .err-msg { font-size: .85rem; color: #dc2626; margin-top: .35rem; display: none; }
+.field.invalid input { border-color: #dc2626; }
+.field.invalid .err-msg { display: block; }
+
+/* 本番／テスト URL の「いずれか必須」エラーは単独の行として出す（入力欄を持たない） */
+#f-site-required { margin-top: -1rem; }
+
+/* EC-CUBE バージョン選択 */
+.radio-row { display: flex; gap: .6rem; flex-wrap: wrap; }
+.radio-row label {
+  flex: 1;
+  min-width: 8rem;
+  margin: 0;
+  padding: .7rem .5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: .92rem;
+  cursor: pointer;
+  /* ラジオ本体は隠さず表示する。視覚的に隠すとスクリーンリーダー・キーボード操作・
+     E2E の check() のいずれもが扱いづらくなるため、カード状の枠だけを装飾する。 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .45rem;
+}
+.radio-row input {
+  width: auto;
+  margin: 0;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+.radio-row label:has(input:checked) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(26, 86, 219, .15);
+}
+
+/* --- ボタン --- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
+  padding: .75rem 1.5rem;
+  font-size: 1rem; font-weight: 600;
+  border: 1px solid transparent; border-radius: 8px;
+  cursor: pointer; text-decoration: none;
+  transition: background .15s, border-color .15s, opacity .15s;
+}
+.btn.primary { background: var(--color-primary); color: #fff; }
+.btn.primary:hover { background: var(--color-primary-dark); }
+.btn.secondary { background: transparent; color: var(--color-primary); border-color: var(--color-border); }
+.btn.secondary:hover { border-color: var(--color-primary); }
+.btn.small { padding: .5rem 1rem; font-size: .9rem; }
+.btn.block { width: 100%; }
+.btn:disabled { opacity: .55; cursor: not-allowed; }
+
+/* --- ステータス表示 --- */
+.status { margin-top: 1rem; padding: .85rem 1rem; border-radius: 8px; font-size: .92rem; line-height: 1.6; display: none; }
+.status.show { display: block; }
+.status.ok { background: rgba(5, 150, 105, .12); color: var(--color-accent); border: 1px solid rgba(5, 150, 105, .3); }
+.status.err { background: rgba(220, 38, 38, .1); color: #dc2626; border: 1px solid rgba(220, 38, 38, .3); }
+.status.info { background: rgba(26, 86, 219, .08); color: var(--color-primary); border: 1px solid rgba(26, 86, 219, .25); }
+
+.spinner {
+  width: 1em; height: 1em; border: 2px solid currentcolor; border-right-color: transparent;
+  border-radius: 50%; display: inline-block; animation: spin .7s linear infinite; vertical-align: -.15em;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.muted-link { color: var(--color-text-light); font-size: .9rem; }
+.center { text-align: center; }
+.mt-2 { margin-top: 1.25rem; }
+
+/* --- マイページ: Client 一覧 / 詳細 --- */
+.org-select-row { display: flex; align-items: center; gap: .75rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+.org-select-row label { font-weight: 600; white-space: nowrap; }
+.org-select-row select { flex: 1; min-width: 200px; }
+
+.client-item { border: 1px solid var(--color-border); border-radius: 10px; padding: 1.1rem 1.25rem; margin-bottom: 1rem; background: var(--color-bg); }
+.client-item .ci-name { font-weight: 700; font-size: 1.05rem; }
+.client-item .ci-domain { color: var(--color-text-light); font-size: .88rem; margin-bottom: .75rem; }
+
+.obadge { display: inline-block; font-size: .72rem; font-weight: 700; padding: .12rem .5rem; border-radius: 999px; margin-right: .5rem; }
+.obadge.prod { background: rgba(5, 150, 105, .15); color: var(--color-accent); }
+.obadge.sand { background: rgba(217, 119, 6, .15); color: #d97706; }
+
+.ci-env { display: flex; align-items: center; gap: .5rem; padding: .45rem 0; border-top: 1px dashed var(--color-border); flex-wrap: wrap; }
+.ci-env code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; background: var(--color-bg-light); padding: .2rem .5rem; border-radius: 5px; word-break: break-all; }
+
+.secret-row { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin: .35rem 0; }
+.secret-row .label { font-weight: 600; min-width: 92px; font-size: .9rem; }
+.secret-row code { flex: 1; min-width: 160px; }
+.icon-btn { background: transparent; border: 1px solid var(--color-border); border-radius: 6px; padding: .3rem .6rem; cursor: pointer; font-size: .82rem; color: var(--color-text); }
+.icon-btn:hover { border-color: var(--color-primary); color: var(--color-primary); }
+
+.next-step { border: 1px solid var(--color-border); border-radius: 10px; padding: 1.1rem 1.25rem; background: rgba(26,86,219,.05); }
+.next-step h3 { margin: 0 0 .5rem; font-size: 1rem; }

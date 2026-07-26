@@ -9,5 +9,9 @@
     {{- block "main" . }}{{ end -}}
   </main>
   {{- partial "footer.html" . -}}
+  {{ if .Params.appPage }}
+  <script>window.ECAUTH = { apiBaseUrl: {{ .Site.Params.apiBaseUrl }}, adminClientId: {{ .Site.Params.adminClientId }}, authRedirectUri: {{ .Site.Params.authRedirectUri }} };</script>
+  {{ end }}
+  {{- block "scripts" . }}{{ end -}}
 </body>
 </html>

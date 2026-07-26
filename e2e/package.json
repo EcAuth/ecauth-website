@@ -1,0 +1,16 @@
+{
+  "name": "ecauth-website-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "test": "playwright test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "@types/node": "^26.0.1",
+    "typescript": "^7.0.2"
+  },
+  "packageManager": "pnpm@10.33.0"
+}

@@ -1,0 +1,15 @@
+{{ define "main" }}
+<div class="app-main">
+  <div class="app-card center">
+    <h1 class="app-title">ログイン処理中</h1>
+    <p class="app-lead" id="cb-message"><span class="spinner"></span> 認証を完了しています…</p>
+    <div class="status" id="status" role="status" aria-live="polite"></div>
+    <p class="center mt-2" id="retry" style="display:none"><a class="muted-link" href="/mypage/">マイページへ戻る</a></p>
+  </div>
+</div>
+{{ end }}
+
+{{ define "scripts" }}
+<script src="/js/app.js"></script>
+<script src="/js/auth-callback.js"></script>
+{{ end }}

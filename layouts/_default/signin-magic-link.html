@@ -1,0 +1,16 @@
+{{ define "main" }}
+<div class="app-main">
+  <div class="app-card">
+    <h1 class="app-title">ログイン</h1>
+    <p class="app-lead">下のボタンを押すとログインを完了し、マイページに移動します。</p>
+
+    <button type="button" class="btn primary block" id="login-btn">ログインを完了する</button>
+    <div class="status" id="status" role="status" aria-live="polite"></div>
+  </div>
+</div>
+{{ end }}
+
+{{ define "scripts" }}
+<script src="/js/app.js"></script>
+<script src="/js/signin-magic-link.js"></script>
+{{ end }}

@@ -1,0 +1,22 @@
+{{ define "main" }}
+<div class="app-main">
+  <div class="app-card">
+    <h1 class="app-title">申込の確認</h1>
+    <p class="app-lead">下のボタンを押すと申込を確定し、パスキーの登録に進みます。</p>
+
+    <button type="button" class="btn primary block" id="confirm-btn">登録を確定する</button>
+    <div class="status" id="status" role="status" aria-live="polite"></div>
+
+    <div id="next-step" class="next-step mt-2" style="display:none">
+      <h3>次のステップ: パスキーを登録</h3>
+      <p class="app-lead" style="margin-bottom:1rem">EcAuth ではパスワードの代わりにパスキー（指紋・顔認証・PIN 等）でログインします。続けてパスキーを登録してください。</p>
+      <button type="button" class="btn primary block" id="passkey-btn">🔑 パスキーを登録する</button>
+    </div>
+  </div>
+</div>
+{{ end }}
+
+{{ define "scripts" }}
+<script src="/js/app.js"></script>
+<script src="/js/signup-confirm.js"></script>
+{{ end }}
