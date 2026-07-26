@@ -120,7 +120,7 @@
 .status.info { background: rgba(26, 86, 219, .08); color: var(--color-primary); border: 1px solid rgba(26, 86, 219, .25); }
 
 .spinner {
-  width: 1em; height: 1em; border: 2px solid currentColor; border-right-color: transparent;
+  width: 1em; height: 1em; border: 2px solid currentcolor; border-right-color: transparent;
   border-radius: 50%; display: inline-block; animation: spin .7s linear infinite; vertical-align: -.15em;
 }
 @keyframes spin { to { transform: rotate(360deg); } }

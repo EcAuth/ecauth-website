@@ -1,7 +1,7 @@
 {{ define "main" }}
 <div class="app-main wide">
   <!-- 読み込み中 -->
-  <div id="loading" class="app-card center"><span class="spinner"></span> 読み込み中…</div>
+  <div id="loading" class="app-card center" role="status" aria-live="polite"><span class="spinner"></span> 読み込み中…</div>
 
   <!-- 未認証: パスキーログイン導線 -->
   <div id="login-view" class="app-card" style="display:none">

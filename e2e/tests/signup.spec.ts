@@ -235,6 +235,45 @@ test('サーバが指摘したフィールドを画面上でも赤くする', as
   await expect(page.locator('#f-test')).not.toHaveClass(/invalid/);
 });
 
+// backend（SignupService）が field に返しうる値と、対応する入力欄の対応表。
+// 対応漏れがあると「エラーは出るがどの欄か分からない」状態になる。
+const FIELD_TO_INPUT: Array<[string, string]> = [
+  ['email', '#f-email'],
+  ['organization_name', '#f-org'],
+  ['production_site_url', '#f-prod'],
+  ['test_site_url', '#f-test'],
+  ['ec_cube_version', '#f-version'],
+];
+
+for (const [field, selector] of FIELD_TO_INPUT) {
+  test(`サーバの field="${field}" が ${selector} に反映される`, async ({ page }) => {
+    mock.on(PATH, {
+      status: 422,
+      body: { error: 'invalid_request', error_description: 'エラーです。', field },
+    });
+
+    await page.goto('/signup/');
+    await fillRequired(page);
+    await page.click('#submit-btn');
+
+    await expect(page.locator('#status')).toHaveClass(/err/);
+    await expect(page.locator(selector)).toHaveClass(/invalid/);
+  });
+}
+
+test('未知の field が返ってもエラー表示は壊れない', async ({ page }) => {
+  mock.on(PATH, {
+    status: 422,
+    body: { error: 'invalid_request', error_description: '不明なエラーです。', field: 'contact_name' },
+  });
+
+  await page.goto('/signup/');
+  await fillRequired(page);
+  await page.click('#submit-btn');
+
+  await expect(page.locator('#status')).toHaveText('不明なエラーです。');
+});
+
 test('409 はサーバの error_description をそのまま表示し、再送信できる状態に戻す', async ({ page }) => {
   mock.on(PATH, {
     status: 409,

@@ -9,6 +9,7 @@
 
   var fEmail = App.$('#f-email'), fOrg = App.$('#f-org'), fContact = App.$('#f-contact');
   var fProd = App.$('#f-prod'), fTest = App.$('#f-test'), fSiteRequired = App.$('#f-site-required');
+  var fVersion = App.$('#f-version');
 
   function val(sel) { return App.$(sel).value.trim(); }
 
@@ -115,10 +116,16 @@
     if (res.status === 409) msg = d.error_description || 'このメールアドレスは既に登録されています。';
     App.setStatus(statusEl, 'err', msg);
     // サーバが指摘したフィールドを画面上でも赤くする（error_description だけでは
-    // どの入力欄の問題か分からないため）。
-    if (d.field === 'email') fEmail.classList.add('invalid');
-    if (d.field === 'organization_name') fOrg.classList.add('invalid');
-    if (d.field === 'production_site_url') fProd.classList.add('invalid');
-    if (d.field === 'test_site_url') fTest.classList.add('invalid');
+    // どの入力欄の問題か分からないため）。backend（SignupService）が field に返しうるのは
+    // email / organization_name / production_site_url / test_site_url / ec_cube_version
+    // の 5 つ（contact_name は返さない）。
+    var fieldMap = {
+      email: fEmail,
+      organization_name: fOrg,
+      production_site_url: fProd,
+      test_site_url: fTest,
+      ec_cube_version: fVersion
+    };
+    if (fieldMap[d.field]) fieldMap[d.field].classList.add('invalid');
   });
 })();

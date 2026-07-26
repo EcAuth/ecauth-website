@@ -100,8 +100,8 @@ function matches(pattern: string | RegExp, path: string): boolean {
 /**
  * EcAuth API のスタブ。パスごとにレスポンスを登録し、飛んできたリクエストを記録する。
  *
- * 登録の無いパスへのリクエストは 599 を返し unhandled に積む。テスト側は
- * expectNoUnhandled() で「想定外のエンドポイントを叩いていないこと」を確認できる。
+ * 登録の無いパスへのリクエストは 599 を返し unhandled に積む。テスト側は afterEach で
+ * `expect(mock.unhandled).toEqual([])` を検証し「想定外のエンドポイントを叩いていないこと」を確認する。
  */
 export class ApiMock {
   /** ハンドラが解決した（= OPTIONS 以外の）リクエストの記録。 */
