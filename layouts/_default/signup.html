@@ -13,9 +13,10 @@
       </div>
 
       <div class="field" id="f-org">
-        <label for="org">組織名（会社名） <span class="opt">（任意）</span></label>
-        <input type="text" id="org" name="org" placeholder="サンプル株式会社" autocomplete="organization" aria-describedby="org-hint">
-        <div class="hint" id="org-hint">請求書の宛名や管理画面の表示名に使用します。後から設定することもできます。</div>
+        <label for="org">組織名（会社名）<span class="req">*</span></label>
+        <input type="text" id="org" name="org" placeholder="サンプル株式会社" autocomplete="organization" aria-describedby="org-hint org-err" maxlength="100" required>
+        <div class="hint" id="org-hint">請求書の宛名や管理画面の表示名に使用します。</div>
+        <div class="err-msg" id="org-err" role="alert">組織名を 100 文字以内で入力してください。</div>
       </div>
 
       <div class="field" id="f-contact">
@@ -23,6 +24,33 @@
         <input type="text" id="contact" name="contact" placeholder="山田 太郎" autocomplete="name" aria-describedby="contact-hint contact-err" required>
         <div class="hint" id="contact-hint">サポート対応時の宛名に使用します。</div>
         <div class="err-msg" id="contact-err" role="alert">ご担当者名を入力してください。</div>
+      </div>
+
+      <div class="field" id="f-prod">
+        <label for="prod">本番サイト URL <span class="opt">（本番・テストのいずれか必須）</span></label>
+        <input type="url" id="prod" name="prod" placeholder="https://example.jp" inputmode="url" autocomplete="url" aria-describedby="prod-hint prod-err">
+        <div class="hint" id="prod-hint">https:// で始まる本番ドメインを入力してください。組織コードはこのドメインから自動生成されます。</div>
+        <div class="err-msg" id="prod-err" role="alert">https:// で始まる有効な URL を入力してください。</div>
+      </div>
+
+      <div class="field" id="f-test">
+        <label for="test">テストサイト URL <span class="opt">（本番・テストのいずれか必須）</span></label>
+        <input type="url" id="test" name="test" placeholder="https://test.example.jp" inputmode="url" autocomplete="url" aria-describedby="test-hint test-err">
+        <div class="hint" id="test-hint">検証環境がある場合に入力してください。本番サイトが未構築の場合はこちらだけでもお申し込みいただけます。</div>
+        <div class="err-msg" id="test-err" role="alert">https:// で始まる有効な URL を入力してください。</div>
+      </div>
+
+      <div class="field" id="f-site-required">
+        <div class="err-msg" id="site-required-err" role="alert">本番・テストのいずれか一方の URL を入力してください。</div>
+      </div>
+
+      <div class="field" id="f-version">
+        <label id="version-label">ご利用の EC プラットフォーム<span class="req">*</span></label>
+        <div class="radio-row" role="radiogroup" aria-labelledby="version-label">
+          <label><input type="radio" name="ec_cube_version" value="4" checked><span>EC-CUBE 4 系</span></label>
+          <label><input type="radio" name="ec_cube_version" value="2"><span>EC-CUBE 2 系</span></label>
+          <label><input type="radio" name="ec_cube_version" value="other"><span>EC-CUBE 以外</span></label>
+        </div>
       </div>
 
       <button type="submit" class="btn primary block" id="submit-btn">申し込む</button>
