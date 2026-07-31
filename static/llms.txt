@@ -29,19 +29,27 @@ EcAuthは、EC-CUBEにパスキー認証やソーシャルログインを導入�
 
 ## 対応プラットフォーム
 
-- EC-CUBE 4系（優先）
-- EC-CUBE 2系
+### 提供中
+
+- EC-CUBE 4.2系 / 4.3系 —「【パスキー対応】EcAuth プラグイン(4.2/4.3系)」をEC-CUBEオーナーズストアで公開中（ダウンロード無料、提供: スキルニル株式会社）
+
+### リリース予定
+
+- EC-CUBE 2系（2.17 / 2.25）
+- EC-CUBE 4.0系 / 4.1系
+- EC-CUBE 4.4系
 
 ## 導入方法
 
-1. EC-CUBEプラグイン（無料）をインストール
-2. EcAuthに申し込み（Organization作成）
-3. プラグイン設定画面でClient ID/Secretを入力
-4. 管理画面にパスキーログインボタンが表示される
+1. EcAuthに申し込み（https://ec-auth.io/signup/ ・Organization作成）
+2. マイページ（https://ec-auth.io/mypage/ ）でClient ID/Client Secretを取得
+3. EC-CUBEプラグイン（無料）をインストール
+4. プラグイン設定画面でClient ID/Client Secretを入力
+5. 管理画面にパスキーログインボタンが表示される
 
 ## 技術スタック
 
-- バックエンド: .NET 9.0 / ASP.NET Core
+- バックエンド: .NET 10.0 / ASP.NET Core
 - データベース: Microsoft SQL Server / Azure SQL Database
 - WebAuthn: Fido2.NetLib
 - インフラ: Azure Web Apps
@@ -49,6 +57,9 @@ EcAuthは、EC-CUBEにパスキー認証やソーシャルログインを導入�
 ## リンク
 
 - ウェブサイト: https://ec-auth.io
+- 申し込み: https://ec-auth.io/signup/
+- マイページ: https://ec-auth.io/mypage/
+- EC-CUBEオーナーズストア（4.2/4.3系プラグイン）: https://www.ec-cube.net/products/detail.php?product_id=3557
 - GitHub: https://github.com/EcAuth
 - EC-CUBE 4系プラグイン: https://github.com/EcAuth/ec-cube4-ecauth
 - EC-CUBE 2系プラグイン: https://github.com/EcAuth/ec-cube2-ecauth

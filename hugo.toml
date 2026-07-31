@@ -17,6 +17,9 @@ disableKinds = ["taxonomy", "term"]
   # 認可リクエストとトークン交換の両方でこの値を使い、アドレスバーの実 URL には依存させない。
   # ローカルは deploy/実行時に HUGO_PARAMS_AUTHREDIRECTURI で上書きする。
   authRedirectUri = "https://ec-auth.io/auth/callback"
+  # EC-CUBE オーナーズストアのプラグイン配布ページ（4.2/4.3系）。
+  # ヘッダー／フッター／トップページから参照するため、URL はここで一元管理する。
+  pluginStoreUrl = "https://www.ec-cube.net/products/detail.php?product_id=3557"
 
 [markup.goldmark.renderer]
   unsafe = true

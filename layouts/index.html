@@ -2,10 +2,81 @@
 <section class="hero">
   <h1>EC-CUBE管理画面を<br>パスキーで守る</h1>
   <p class="tagline">フィッシング対策認証を、プラグインひとつで。</p>
+  <div class="hero-actions">
+    <a href="/signup/" class="btn-cta primary">無料で申し込む</a>
+    <a href="{{ .Site.Params.pluginStoreUrl }}" class="btn-cta secondary" rel="noopener">プラグインを入手する</a>
+  </div>
+  <p class="hero-note">5ユーザーまで無料。プラグインのダウンロードも無料です。</p>
 </section>
 
 <section class="features">
   {{ .Content }}
+</section>
+
+<section class="plugin">
+  <div class="plugin-inner">
+    <h2>EC-CUBE プラグイン</h2>
+    <p class="section-lead">EC-CUBE オーナーズストアから無料でダウンロードできます。</p>
+
+    <div class="plugin-card">
+      <span class="pill available">提供中</span>
+      <h3>【パスキー対応】EcAuth プラグイン(4.2/4.3系)</h3>
+      <p class="plugin-versions">
+        対応バージョン: EC-CUBE 4.3系（4.3.0 / 4.3.1 / 4.3.1-p1）、4.2系（4.2.0 〜 4.2.3-p2）
+      </p>
+      <a href="{{ .Site.Params.pluginStoreUrl }}" class="btn-cta primary" rel="noopener">
+        オーナーズストアで入手する &rarr;
+      </a>
+      <p class="plugin-meta">提供: スキルニル株式会社 ／ ダウンロード無料</p>
+    </div>
+
+    <h3 class="upcoming-title">リリース予定</h3>
+    <ul class="upcoming-list">
+      <li>
+        <span class="pill upcoming">準備中</span>
+        <strong>EC-CUBE 2系</strong>
+        <span class="upcoming-desc">2.17 / 2.25 対応版</span>
+      </li>
+      <li>
+        <span class="pill upcoming">準備中</span>
+        <strong>EC-CUBE 4.0/4.1系</strong>
+        <span class="upcoming-desc">4.2/4.3系と同等の管理画面パスキーログイン</span>
+      </li>
+      <li>
+        <span class="pill upcoming">準備中</span>
+        <strong>EC-CUBE 4.4系</strong>
+        <span class="upcoming-desc">4.2/4.3系と同等の管理画面パスキーログイン</span>
+      </li>
+    </ul>
+    <p class="note">上記バージョン向けのプラグインは順次リリース予定です。リリース時期はGitHubでお知らせします。</p>
+  </div>
+</section>
+
+<section class="steps">
+  <h2>ご利用の流れ</h2>
+  <ol class="step-list">
+    <li>
+      <span class="step-num">1</span>
+      <div>
+        <strong><a href="/signup/">EcAuth に申し込む</a></strong>
+        <p>メールアドレス・組織名・ご利用サイトの URL を登録します。確認メールのリンクからパスキーを登録してご利用開始です。</p>
+      </div>
+    </li>
+    <li>
+      <span class="step-num">2</span>
+      <div>
+        <strong><a href="/mypage/">マイページで Client ID / Client Secret を取得</a></strong>
+        <p>パスキーでログインすると、本番サイト用・テストサイト用の認証情報を確認できます。</p>
+      </div>
+    </li>
+    <li>
+      <span class="step-num">3</span>
+      <div>
+        <strong>プラグインをインストールして設定</strong>
+        <p>EC-CUBE 管理画面の「EcAuth 設定」に Client ID / Client Secret を入力すると、ログイン画面にパスキーログインボタンが表示されます。</p>
+      </div>
+    </li>
+  </ol>
 </section>
 
 <section class="roadmap">
@@ -13,6 +84,7 @@
   <ul class="roadmap-list">
     <li class="roadmap-item current">
       <span class="roadmap-label">Phase 1</span>
+      <span class="pill available">提供中</span>
       <strong>B2B パスキー認証</strong>
       <p>EC-CUBE管理画面向けパスキー認証（WebAuthn/FIDO2）</p>
     </li>
@@ -34,9 +106,13 @@
   </ul>
 </section>
 
-<section class="coming-soon">
-  <div class="badge">Coming Soon</div>
-  <p>サービス準備中です。リリースまでしばらくお待ちください。</p>
+<section class="cta">
+  <h2>今すぐ始める</h2>
+  <p>お申し込みは無料。5ユーザーまで無料でご利用いただけます。</p>
+  <div class="cta-actions">
+    <a href="/signup/" class="btn-cta primary">無料で申し込む</a>
+    <a href="/mypage/" class="btn-cta ghost">マイページへログイン</a>
+  </div>
   <a href="https://github.com/EcAuth" class="github-link">
     GitHub で開発状況を確認する &rarr;
   </a>
