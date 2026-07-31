@@ -1,5 +1,11 @@
 <footer class="site-footer">
   <div class="container">
+    <nav class="footer-nav" aria-label="フッターメニュー">
+      <a href="/signup/">申し込み</a>
+      <a href="/mypage/">マイページ</a>
+      <a href="{{ .Site.Params.pluginStoreUrl }}" rel="noopener">EC-CUBE プラグイン</a>
+      <a href="https://github.com/EcAuth" rel="noopener">GitHub</a>
+    </nav>
     <p>&copy; {{ now.Year }} EcAuth. All rights reserved.</p>
   </div>
 </footer>

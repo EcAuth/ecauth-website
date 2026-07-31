@@ -1,8 +1,13 @@
 <header class="site-header">
-  <div class="container">
+  <div class="container header-inner">
     <a href="/" class="logo">
       <span class="logo-icon">🔐</span>
       <span class="logo-text">EcAuth</span>
     </a>
+    <nav class="site-nav" aria-label="メインメニュー">
+      <a href="{{ .Site.Params.pluginStoreUrl }}" class="nav-link" rel="noopener">プラグイン</a>
+      <a href="/mypage/" class="nav-link">マイページ</a>
+      <a href="/signup/" class="nav-cta">申し込む</a>
+    </nav>
   </div>
 </header>
