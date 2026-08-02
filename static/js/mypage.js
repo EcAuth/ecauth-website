@@ -283,6 +283,20 @@
 
     function renderCount() { count.textContent = values.length + ' 件'; }
 
+    /*
+     * 保存リクエストの飛行中はセクション全体の編集操作を止める。
+     * 送信ボディは「保存」を押した時点のスナップショットなので、飛行中に加えた編集は
+     * 送られていない。にもかかわらず成功時の renderRows(values) で上書きされるため、
+     * ロックしないと「送っていない変更が黙って消えたのに『保存しました』と出る」状態になる。
+     */
+    function setBusy(busy) {
+      save.disabled = busy;
+      add.disabled = busy;
+      cancel.disabled = busy;
+      Array.prototype.forEach.call(
+        list.querySelectorAll('.row-input, .row-del'), function (n) { n.disabled = busy; });
+    }
+
     add.addEventListener('click', function () {
       var next = collect();
       next.push('');
@@ -300,12 +314,12 @@
       var body = {};
       body[section.key] = collect();
 
-      save.disabled = true;
       var original = save.textContent;
       save.textContent = '保存中…';
+      setBusy(true);
       var res = await authFetch(
         'POST', '/v1/account/clients/' + encodeURIComponent(client.id) + '/' + section.path, body);
-      save.disabled = false;
+      setBusy(false);
       save.textContent = original;
 
       if (res.status === 401) { requireLogin(); return; }

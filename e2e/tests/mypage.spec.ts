@@ -723,6 +723,48 @@ test.describe('認証済', () => {
       expect(mock.countTo(redirectUrisPath(PROD_ID))).toBe(0);
     });
 
+    test('保存中はセクションの編集操作をロックする', async ({ page }) => {
+      mock.on(CLIENTS_PATH, { status: 200, body: CLIENTS_BODY });
+
+      // 応答を保留し、リクエスト飛行中の画面状態を観測できるようにする。
+      let release: () => void = () => {};
+      const inFlight = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      mock.on(redirectUrisPath(PROD_ID), async () => {
+        await inFlight;
+        return {
+          status: 200,
+          body: {
+            id: PROD_ID,
+            client_id: 'prod-client-id',
+            redirect_uris: ['https://shop.example.com/admin/ecauth/callback'],
+          },
+        };
+      });
+
+      await page.goto('/mypage/');
+      const section = await openSection(itemOf(page, '本番サイト'), 'redirect_uris');
+      await section.locator('.row-save').click();
+
+      // 送信ボディは「保存」を押した時点のスナップショット。飛行中に編集できてしまうと、
+      // 送っていない変更が成功時の再描画で黙って消え、しかも「保存しました」と出る。
+      await expect(section.locator('.row-save')).toBeDisabled();
+      await expect(section.locator('.row-input').first()).toBeDisabled();
+      await expect(section.locator('.row-del').first()).toBeDisabled();
+      await expect(section.locator('.row-add')).toBeDisabled();
+      await expect(section.locator('.row-cancel')).toBeDisabled();
+
+      release();
+
+      await expect(section.locator('[data-status="section"]')).toHaveClass(/ok/);
+      await expect(section.locator('.row-save')).toBeEnabled();
+      await expect(section.locator('.row-input').first()).toBeEnabled();
+      await expect(section.locator('.row-del').first()).toBeEnabled();
+      await expect(section.locator('.row-add')).toBeEnabled();
+      await expect(section.locator('.row-cancel')).toBeEnabled();
+    });
+
     test('保存中に 401 になったらログイン画面に戻す', async ({ page }) => {
       mock.on(CLIENTS_PATH, { status: 200, body: CLIENTS_BODY });
       mock.on(redirectUrisPath(PROD_ID), { status: 401, body: { error: 'invalid_token' } });
@@ -745,6 +787,10 @@ test.describe('認証済', () => {
 
       await expect(section.locator('[data-status="section"]')).toHaveClass(/err/);
       await expect(section.locator('[data-status="section"]')).toContainText('保存に失敗しました');
+      // 失敗しても編集を再開できる状態に戻ること。
+      await expect(section.locator('.row-input').first()).toBeEnabled();
+      await expect(section.locator('.row-add')).toBeEnabled();
+      await expect(section.locator('.row-save')).toBeEnabled();
     });
   });
 });

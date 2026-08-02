@@ -150,6 +150,8 @@
 .secret-row code { flex: 1; min-width: 160px; }
 .icon-btn { background: transparent; border: 1px solid var(--color-border); border-radius: 6px; padding: .3rem .6rem; cursor: pointer; font-size: .82rem; color: var(--color-text); }
 .icon-btn:hover { border-color: var(--color-primary); color: var(--color-primary); }
+.icon-btn:disabled { opacity: .55; cursor: not-allowed; }
+.icon-btn:disabled:hover { border-color: var(--color-border); color: var(--color-text); }
 
 .next-step { border: 1px solid var(--color-border); border-radius: 10px; padding: 1.1rem 1.25rem; background: rgba(26,86,219,.05); }
 .next-step h3 { margin: 0 0 .5rem; font-size: 1rem; }
@@ -177,6 +179,8 @@
   color: var(--color-text);
 }
 .row-input:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(26, 86, 219, .15); }
+/* 保存リクエスト飛行中は編集を止める（送信済みボディと画面がズレないようにするため）。 */
+.row-input:disabled { opacity: .6; cursor: not-allowed; }
 .row-add { margin-bottom: .6rem; }
 .row-actions { display: flex; gap: .5rem; margin-top: .6rem; }
 
