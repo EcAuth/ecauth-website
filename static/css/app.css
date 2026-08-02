@@ -153,3 +153,33 @@
 
 .next-step { border: 1px solid var(--color-border); border-radius: 10px; padding: 1.1rem 1.25rem; background: rgba(26,86,219,.05); }
 .next-step h3 { margin: 0 0 .5rem; font-size: 1rem; }
+
+/* --- マイページ: Client 設定（redirect_uri / RP ID）の編集 --- */
+/* 主用途は client_id / client_secret のコピーなので、編集欄は details で畳んでおく。 */
+.ci-settings { border-top: 1px dashed var(--color-border); margin-top: .75rem; padding-top: .6rem; }
+.ci-settings > summary { cursor: pointer; font-weight: 600; font-size: .92rem; }
+.ci-settings > summary::marker { color: var(--color-text-light); }
+.ci-count { color: var(--color-text-light); font-weight: 400; font-size: .85rem; margin-left: .4rem; }
+
+.row-list { margin: .6rem 0 .4rem; }
+.list-row { display: flex; align-items: center; gap: .5rem; margin-bottom: .4rem; }
+/* サーバのエラーは「N 件目」という位置で返るため、行番号は必ず見せる。 */
+.row-no { color: var(--color-text-light); font-size: .82rem; min-width: 1.2rem; text-align: right; }
+.row-input {
+  flex: 1;
+  min-width: 0;
+  padding: .45rem .6rem;
+  font-size: .9rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg-light);
+  color: var(--color-text);
+}
+.row-input:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(26, 86, 219, .15); }
+.row-add { margin-bottom: .6rem; }
+.row-actions { display: flex; gap: .5rem; margin-top: .6rem; }
+
+.ci-settings .hint { font-size: .82rem; color: var(--color-text-light); line-height: 1.6; margin: .35rem 0 0; }
+.ci-settings .hint.warn { color: #d97706; }
+.ci-settings .status { margin-top: .75rem; }

@@ -157,6 +157,181 @@
     return row;
   }
 
+  /*
+   * Client 設定（redirect_uri / allowed_rp_ids）の編集セクション。
+   *
+   * API はどちらも「配列を受け取ってリストごと全置換」する POST。CORS ポリシーが
+   * GET / POST / OPTIONS 限定のため PUT / DELETE は使えない。
+   *
+   * サーバは入力値をエラーに載せず「N 件目の redirect_uri は…」という**位置**で返す
+   * （redirect_uri は user:pass@ を含みうるため、反映するとログに資格情報が残る）。
+   * そのため画面の行番号と送信配列の添字を必ず一致させる:
+   *   - 行は表示順のまま送る
+   *   - 空欄の行も落とさずに送る（クライアントで詰めると位置がずれ、別の行を指すエラーになる）
+   * 空要素はサーバ側が捨てる。
+   */
+  var SECTIONS = [
+    {
+      key: 'redirect_uris',
+      path: 'redirect-uris',
+      title: 'コールバック URL（redirect_uri）',
+      inputType: 'url',
+      placeholder: 'https://shop.example.jp/ecauth/callback',
+      hints: [
+        'EC-CUBE 4 系は https://{管理画面のホスト}/ecauth/callback、2 系は https://{管理画面のホスト}/ecauth/callback.php です。',
+        'サブディレクトリに設置している場合は、そのパスを前に付けてください（例: https://shop.example.jp/shop/ecauth/callback）。'
+      ],
+      warning: null,
+      // 消しても再設定すれば復旧できるため確認は挟まない。
+      confirmMessage: null
+    },
+    {
+      key: 'allowed_rp_ids',
+      path: 'allowed-rp-ids',
+      title: 'パスキーのドメイン（RP ID）',
+      inputType: 'text',
+      placeholder: 'shop.example.jp',
+      hints: [
+        '管理画面のホスト名だけを指定します。https:// やポート番号（:8443）、IP アドレスは指定できません。'
+      ],
+      // パスキーは RP ID に束縛されるため、変更は既存の資格情報を無効化する破壊的操作になる。
+      warning: '変更・削除すると、そのドメインで登録済みのパスキーは使えなくなり、再登録が必要になります。',
+      confirmMessage: 'パスキーのドメイン（RP ID）を変更します。削除・変更したドメインで登録済みのパスキーは使えなくなり、再登録が必要です。よろしいですか？'
+    }
+  ];
+
+  function descriptionOf(res) {
+    return res && res.data && typeof res.data.error_description === 'string' ? res.data.error_description : '';
+  }
+
+  function makeSettingsSection(client, section) {
+    // 直近にサーバへ保存された値。「取り消し」の戻り先であり、件数表示の元でもある。
+    var values = (client[section.key] || []).slice();
+
+    var box = el('details', 'ci-settings');
+    box.setAttribute('data-section', section.key);
+
+    var summary = document.createElement('summary');
+    summary.appendChild(document.createTextNode(section.title));
+    var count = el('span', 'ci-count');
+    summary.appendChild(count);
+    box.appendChild(summary);
+
+    var list = el('div', 'row-list');
+    box.appendChild(list);
+
+    var add = el('button', 'icon-btn row-add', '+ 追加');
+    add.type = 'button';
+    box.appendChild(add);
+
+    section.hints.forEach(function (h) { box.appendChild(el('p', 'hint', h)); });
+    if (section.warning) box.appendChild(el('p', 'hint warn', '⚠ ' + section.warning));
+
+    var actions = el('div', 'row-actions');
+    var save = el('button', 'btn primary small row-save', '保存');
+    save.type = 'button';
+    var cancel = el('button', 'btn secondary small row-cancel', '取り消し');
+    cancel.type = 'button';
+    actions.appendChild(save);
+    actions.appendChild(cancel);
+    box.appendChild(actions);
+
+    // App.setStatus / clearStatus は className を丸ごと差し替えるため、目印はクラスではなく
+    // 属性で持つ（クラスに付けると 1 回目の setStatus で消える）。
+    var statusEl = el('div', 'status');
+    statusEl.setAttribute('data-status', 'section');
+    statusEl.setAttribute('role', 'status');
+    statusEl.setAttribute('aria-live', 'polite');
+    box.appendChild(statusEl);
+
+    // 画面の行から配列を作る。空欄も落とさない（サーバのエラー位置と対応づけるため）。
+    function collect() {
+      return Array.prototype.map.call(
+        list.querySelectorAll('.row-input'), function (input) { return input.value; });
+    }
+
+    function renderRows(items) {
+      list.textContent = '';
+      // 0 件だと入力する場所が無いので、空の行を 1 つ出す。
+      (items.length ? items : ['']).forEach(function (value, index) {
+        var row = el('div', 'list-row');
+        var no = index + 1;
+        row.appendChild(el('span', 'row-no', String(no)));
+
+        var input = document.createElement('input');
+        input.className = 'row-input';
+        input.type = section.inputType;
+        input.value = value;
+        input.placeholder = section.placeholder;
+        input.setAttribute('aria-label', section.title + ' ' + no + ' 件目');
+        row.appendChild(input);
+
+        var del = el('button', 'icon-btn row-del', '削除');
+        del.type = 'button';
+        del.setAttribute('aria-label', section.title + ' ' + no + ' 件目を削除');
+        del.addEventListener('click', function () {
+          // 他の行に入力途中の値があっても失わないよう、画面の現在値から作り直す。
+          var next = collect();
+          next.splice(index, 1);
+          renderRows(next);
+        });
+        row.appendChild(del);
+
+        list.appendChild(row);
+      });
+    }
+
+    function renderCount() { count.textContent = values.length + ' 件'; }
+
+    add.addEventListener('click', function () {
+      var next = collect();
+      next.push('');
+      renderRows(next);
+    });
+
+    cancel.addEventListener('click', function () {
+      App.clearStatus(statusEl);
+      renderRows(values);
+    });
+
+    save.addEventListener('click', async function () {
+      if (section.confirmMessage && !global_confirm(section.confirmMessage)) return;
+
+      var body = {};
+      body[section.key] = collect();
+
+      save.disabled = true;
+      var original = save.textContent;
+      save.textContent = '保存中…';
+      var res = await authFetch(
+        'POST', '/v1/account/clients/' + encodeURIComponent(client.id) + '/' + section.path, body);
+      save.disabled = false;
+      save.textContent = original;
+
+      if (res.status === 401) { requireLogin(); return; }
+      if (!res.ok || !res.data || !Array.isArray(res.data[section.key])) {
+        // 422 は error_description に「N 件目の…」という位置付きの理由が入る。そのまま見せる
+        // （setStatus は textContent なのでサーバ由来の文字列を渡しても安全）。
+        // ここで再描画はしない。入力を残したまま直して再送できるようにするため。
+        App.setStatus(statusEl, 'err',
+          descriptionOf(res) || '保存に失敗しました。時間をおいて再度お試しください。');
+        return;
+      }
+
+      // 保存されたのは正規化後の値（ホストの小文字化・Punycode 化・重複の畳み込み・空要素の除去）。
+      // 入力のままではなく、実際に保存された配列で描き直す。
+      values = res.data[section.key].slice();
+      client[section.key] = values.slice();
+      renderRows(values);
+      renderCount();
+      App.setStatus(statusEl, 'ok', '保存しました。');
+    });
+
+    renderRows(values);
+    renderCount();
+    return box;
+  }
+
   function renderClients(clients) {
     clientsEl.textContent = '';
     if (!clients.length) {
@@ -174,6 +349,7 @@
 
       item.appendChild(makeCodeRow('Client ID', c.client_id));
       item.appendChild(makeSecretRow(c));
+      SECTIONS.forEach(function (s) { item.appendChild(makeSettingsSection(c, s)); });
 
       clientsEl.appendChild(item);
     });
@@ -200,13 +376,17 @@
   function global_confirm(msg) { return window.confirm(msg); }
 
   // --- 認証付き fetch ---
-  async function authFetch(method, path) {
+  // body を渡すと JSON として送る（渡さなければヘッダも付けない）。
+  async function authFetch(method, path, body) {
     var token = sessionStorage.getItem(AT_KEY);
+    var headers = { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json' };
+    var init = { method: method, headers: headers };
+    if (body !== undefined) {
+      headers['Content-Type'] = 'application/json';
+      init.body = JSON.stringify(body);
+    }
     try {
-      var res = await fetch(apiBase() + path, {
-        method: method,
-        headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json' }
-      });
+      var res = await fetch(apiBase() + path, init);
       var data = null;
       try { data = await res.json(); } catch (e) {}
       return { ok: res.ok, status: res.status, data: data };
