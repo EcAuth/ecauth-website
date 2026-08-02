@@ -16,13 +16,13 @@
   <div id="app-view" style="display:none">
     <div class="app-card">
       <h1 class="app-title">Client 情報</h1>
-      <p class="app-lead">EC-CUBE プラグインに設定する Client ID / Client Secret です。<strong>本番サイト</strong>と<strong>テストサイト</strong>で別々に設定してください。</p>
+      <p class="app-lead">EC-CUBE プラグインに設定する Client ID / Client Secret です。<strong>本番サイト</strong>と<strong>テストサイト</strong>で別々に設定してください。各サイトの<strong>コールバック URL</strong>と<strong>パスキーのドメイン</strong>も、それぞれの欄を開いて変更できます。</p>
       <div id="clients"></div>
       <div class="status" id="list-status" role="status" aria-live="polite"></div>
     </div>
     <div class="app-card next-step">
       <h3>次のステップ</h3>
-      <p class="app-lead" style="margin:0">EC-CUBE 管理画面の「EcAuth 設定」に、上記の Client ID / Client Secret を入力してください。設定後、管理者用パスキーの登録に進めます。</p>
+      <p class="app-lead" style="margin:0">EC-CUBE 管理画面の「EcAuth 設定」に、上記の Client ID / Client Secret を入力してください。設定後、管理者用パスキーの登録に進めます。パスキーの登録・ログインが失敗する場合は、コールバック URL とパスキーのドメインが管理画面の URL と一致しているか確認してください。</p>
     </div>
     <p class="center mt-2"><a class="muted-link" href="#" id="logout-link">ログアウト</a></p>
   </div>

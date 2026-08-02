@@ -31,6 +31,8 @@ const PROD_ID = 11;
 const SANDBOX_ID = 12;
 const revealPath = (id: number) => `/v1/account/clients/${id}/secret/reveal`;
 const regeneratePath = (id: number) => `/v1/account/clients/${id}/secret`;
+const redirectUrisPath = (id: number) => `/v1/account/clients/${id}/redirect-uris`;
+const allowedRpIdsPath = (id: number) => `/v1/account/clients/${id}/allowed-rp-ids`;
 
 const ACCESS_TOKEN = 'account-access-token';
 
@@ -45,6 +47,7 @@ const CLIENTS_BODY = {
       organization_code: 'shop-example-com',
       organization_name: 'サンプル株式会社',
       redirect_uris: ['https://shop.example.com/admin/ecauth/callback'],
+      allowed_rp_ids: ['shop.example.com'],
     },
     {
       id: SANDBOX_ID,
@@ -55,12 +58,31 @@ const CLIENTS_BODY = {
       organization_code: 'stg-shop-example-com',
       organization_name: 'サンプル株式会社',
       redirect_uris: [],
+      allowed_rp_ids: [],
     },
   ],
 };
 
 function itemOf(page: Page, appName: string): Locator {
   return page.locator('.client-item').filter({ hasText: appName });
+}
+
+/** Client カード内の設定セクション（details）。data-section は mypage.js の SECTIONS[].key。 */
+function sectionOf(item: Locator, key: 'redirect_uris' | 'allowed_rp_ids'): Locator {
+  return item.locator(`.ci-settings[data-section="${key}"]`);
+}
+
+/** 畳まれている設定セクションを開いて返す。 */
+async function openSection(item: Locator, key: 'redirect_uris' | 'allowed_rp_ids'): Promise<Locator> {
+  const section = sectionOf(item, key);
+  await section.locator('summary').click();
+  await expect(section.locator('.row-list')).toBeVisible();
+  return section;
+}
+
+/** 設定セクションの入力欄の値を表示順に取り出す。 */
+function inputValuesOf(section: Locator): Promise<string[]> {
+  return section.locator('.row-input').evaluateAll((els) => els.map((e) => (e as HTMLInputElement).value));
 }
 function secretRowOf(item: Locator): Locator {
   return item.locator('.secret-row').filter({ hasText: 'Client Secret' });
@@ -409,5 +431,366 @@ test.describe('認証済', () => {
     expect(await item.locator('script').count()).toBe(0);
     expect(await page.evaluate(() => (window as unknown as { __xss?: number }).__xss)).toBeUndefined();
     expect(await page.evaluate(() => (window as unknown as { __xss2?: number }).__xss2)).toBeUndefined();
+  });
+
+  /**
+   * Client 設定（redirect_uri / allowed_rp_ids）の編集。
+   *
+   * どちらの API も「配列を受け取ってリストごと全置換」する POST で、エラーは入力値ではなく
+   * 「N 件目の…」という**位置**で返る（サーバが redirect_uri を反映するとログに user:pass@ が
+   * 残るため）。したがって画面の行と送信配列の添字が 1:1 であることが仕様の要になる。
+   * ここではその対応関係（順序・空欄の保持・削除後の詰め方）を固定する。
+   */
+  test.describe('Client 設定の編集', () => {
+    test('現在値を行として表示し、既定では畳んでおく', async ({ page }) => {
+      mock.on(CLIENTS_PATH, { status: 200, body: CLIENTS_BODY });
+
+      await page.goto('/mypage/');
+      const prod = itemOf(page, '本番サイト');
+
+      const uris = sectionOf(prod, 'redirect_uris');
+      await expect(uris.locator('.ci-count')).toHaveText('1 件');
+      // 主用途は client_id / secret のコピーなので、編集欄は開くまで出さない。
+      await expect(uris.locator('.row-list')).toBeHidden();
+
+      await openSection(prod, 'redirect_uris');
+      await expect(uris.locator('.row-input')).toHaveValue('https://shop.example.com/admin/ecauth/callback');
+      await expect(uris.locator('.row-no')).toHaveText('1');
+
+      const rpIds = await openSection(prod, 'allowed_rp_ids');
+      await expect(rpIds.locator('.ci-count')).toHaveText('1 件');
+      await expect(rpIds.locator('.row-input')).toHaveValue('shop.example.com');
+    });
+
+    test('0 件でも入力できるよう空の行を 1 つ出す', async ({ page }) => {
+      mock.on(CLIENTS_PATH, { status: 200, body: CLIENTS_BODY });
+
+      await page.goto('/mypage/');
+      const sandbox = itemOf(page, 'テストサイト');
+
+      await expect(sectionOf(sandbox, 'redirect_uris').locator('.ci-count')).toHaveText('0 件');
+      const section = await openSection(sandbox, 'redirect_uris');
+      await expect(section.locator('.list-row')).toHaveCount(1);
+      await expect(section.locator('.row-input')).toHaveValue('');
+    });
+
+    test('行を追加して保存すると、表示順どおりの配列で全置換する', async ({ page }) => {
+      mock.on(CLIENTS_PATH, { status: 200, body: CLIENTS_BODY });
+      mock.on(redirectUrisPath(PROD_ID), (req) => ({
+        status: 200,
+        body: {
+          id: PROD_ID,
+          client_id: 'prod-client-id',
+          redirect_uris: (req.json as { redirect_uris: string[] }).redirect_uris,
+        },
+      }));
+
+      await page.goto('/mypage/');
+      const section = await openSection(itemOf(page, '本番サイト'), 'redirect_uris');
+
+      await section.locator('.row-add').click();
+      await expect(section.locator('.list-row')).toHaveCount(2);
+      await section.locator('.row-input').nth(1).fill('https://shop.example.com/ecauth/callback');
+      await section.getByRole('button', { name: '保存' }).click();
+
+      await expect(section.locator('[data-status="section"]')).toHaveClass(/ok/);
+      expect(mock.lastCallTo(redirectUrisPath(PROD_ID))!.json).toEqual({
+        redirect_uris: [
+          'https://shop.example.com/admin/ecauth/callback',
+          'https://shop.example.com/ecauth/callback',
+        ],
+      });
+      await expect(section.locator('.ci-count')).toHaveText('2 件');
+    });
+
+    test('行を削除すると番号を振り直し、他の行の入力途中の値は失わない', async ({ page }) => {
+      mock.on(CLIENTS_PATH, {
+        status: 200,
+        body: {
+          clients: [
+            {
+              ...CLIENTS_BODY.clients[0],
+              redirect_uris: [
+                'https://a.example.com/ecauth/callback',
+                'https://b.example.com/ecauth/callback',
+                'https://c.example.com/ecauth/callback',
+              ],
+            },
+          ],
+        },
+      });
+      mock.on(redirectUrisPath(PROD_ID), (req) => ({
+        status: 200,
+        body: {
+          id: PROD_ID,
+          client_id: 'prod-client-id',
+          redirect_uris: (req.json as { redirect_uris: string[] }).redirect_uris,
+        },
+      }));
+
+      await page.goto('/mypage/');
+      const section = await openSection(itemOf(page, '本番サイト'), 'redirect_uris');
+
+      // 3 行目を編集してから 1 行目を消す（未保存の編集が消えないこと）。
+      await section.locator('.row-input').nth(2).fill('https://z.example.com/ecauth/callback');
+      await section.locator('.row-del').nth(0).click();
+
+      await expect(section.locator('.list-row')).toHaveCount(2);
+      await expect(section.locator('.row-no')).toHaveText(['1', '2']);
+      expect(await inputValuesOf(section)).toEqual([
+        'https://b.example.com/ecauth/callback',
+        'https://z.example.com/ecauth/callback',
+      ]);
+
+      await section.getByRole('button', { name: '保存' }).click();
+      await expect(section.locator('[data-status="section"]')).toHaveClass(/ok/);
+      expect(mock.lastCallTo(redirectUrisPath(PROD_ID))!.json).toEqual({
+        redirect_uris: ['https://b.example.com/ecauth/callback', 'https://z.example.com/ecauth/callback'],
+      });
+    });
+
+    test('空欄の行も落とさずに送る（サーバのエラー位置と行番号を一致させるため）', async ({ page }) => {
+      mock.on(CLIENTS_PATH, { status: 200, body: CLIENTS_BODY });
+      // 空要素はサーバ側が捨てるため、レスポンスは詰めた配列になる。
+      mock.on(redirectUrisPath(SANDBOX_ID), {
+        status: 200,
+        body: {
+          id: SANDBOX_ID,
+          client_id: 'sandbox-client-id',
+          redirect_uris: ['https://stg.shop.example.com/ecauth/callback'],
+        },
+      });
+
+      await page.goto('/mypage/');
+      const section = await openSection(itemOf(page, 'テストサイト'), 'redirect_uris');
+
+      // 1 行目は空のまま、2 行目にだけ入力する。
+      await section.locator('.row-add').click();
+      await section.locator('.row-input').nth(1).fill('https://stg.shop.example.com/ecauth/callback');
+      await section.getByRole('button', { name: '保存' }).click();
+
+      await expect(section.locator('[data-status="section"]')).toHaveClass(/ok/);
+      expect(mock.lastCallTo(redirectUrisPath(SANDBOX_ID))!.json).toEqual({
+        redirect_uris: ['', 'https://stg.shop.example.com/ecauth/callback'],
+      });
+      // 保存後はサーバが返した配列（空要素を落としたもの）で描き直す。
+      await expect(section.locator('.list-row')).toHaveCount(1);
+      await expect(section.locator('.ci-count')).toHaveText('1 件');
+    });
+
+    test('保存後はサーバが正規化した値で描き直す', async ({ page }) => {
+      mock.on(CLIENTS_PATH, { status: 200, body: CLIENTS_BODY });
+      // 実サーバは小文字化・Punycode 化・重複の畳み込みを行う。
+      mock.on(allowedRpIdsPath(PROD_ID), {
+        status: 200,
+        body: { id: PROD_ID, client_id: 'prod-client-id', allowed_rp_ids: ['shop.example.com'] },
+      });
+
+      page.on('dialog', (dialog) => dialog.accept());
+
+      await page.goto('/mypage/');
+      const section = await openSection(itemOf(page, '本番サイト'), 'allowed_rp_ids');
+
+      await section.locator('.row-input').nth(0).fill('SHOP.Example.COM');
+      await section.locator('.row-add').click();
+      await section.locator('.row-input').nth(1).fill('shop.example.com');
+      await section.getByRole('button', { name: '保存' }).click();
+
+      await expect(section.locator('[data-status="section"]')).toHaveClass(/ok/);
+      await expect(section.locator('.list-row')).toHaveCount(1);
+      await expect(section.locator('.row-input')).toHaveValue('shop.example.com');
+      await expect(section.locator('.ci-count')).toHaveText('1 件');
+    });
+
+    test('422 は error_description をそのまま出し、入力は保持して直せるようにする', async ({ page }) => {
+      mock.on(CLIENTS_PATH, { status: 200, body: CLIENTS_BODY });
+      mock.on(redirectUrisPath(PROD_ID), {
+        status: 422,
+        body: {
+          error: 'invalid_redirect_uri',
+          error_description: '2 件目の redirect_uri は https:// で始まる正しい URL を指定してください。',
+          field: 'redirect_uris',
+        },
+      });
+
+      await page.goto('/mypage/');
+      const prod = itemOf(page, '本番サイト');
+      const section = await openSection(prod, 'redirect_uris');
+
+      await section.locator('.row-add').click();
+      await section.locator('.row-input').nth(1).fill('http://insecure.example.com/ecauth/callback');
+      await section.getByRole('button', { name: '保存' }).click();
+
+      const status = section.locator('[data-status="section"]');
+      await expect(status).toHaveClass(/err/);
+      await expect(status).toHaveText('2 件目の redirect_uri は https:// で始まる正しい URL を指定してください。');
+
+      // 入力は消さない。「2 件目」がそのまま 2 行目を指し続けること。
+      expect(await inputValuesOf(section)).toEqual([
+        'https://shop.example.com/admin/ecauth/callback',
+        'http://insecure.example.com/ecauth/callback',
+      ]);
+      await expect(section.locator('.row-no')).toHaveText(['1', '2']);
+      // 件数は保存できていないので変わらない。
+      await expect(section.locator('.ci-count')).toHaveText('1 件');
+      // 操作していないセクションにはエラーを出さない。
+      await expect(sectionOf(prod, 'allowed_rp_ids').locator('[data-status="section"]')).toBeHidden();
+    });
+
+    test('エラー文言に HTML が含まれてもテキストとして描画する（XSS 回避）', async ({ page }) => {
+      mock.on(CLIENTS_PATH, { status: 200, body: CLIENTS_BODY });
+      mock.on(redirectUrisPath(PROD_ID), {
+        status: 422,
+        body: {
+          error: 'invalid_redirect_uri',
+          error_description: '<img src=x onerror="window.__xss3=1">',
+          field: 'redirect_uris',
+        },
+      });
+
+      await page.goto('/mypage/');
+      const section = await openSection(itemOf(page, '本番サイト'), 'redirect_uris');
+      await section.getByRole('button', { name: '保存' }).click();
+
+      const status = section.locator('[data-status="section"]');
+      await expect(status).toContainText('<img src=x onerror=');
+      expect(await status.locator('img').count()).toBe(0);
+      expect(await page.evaluate(() => (window as unknown as { __xss3?: number }).__xss3)).toBeUndefined();
+    });
+
+    test('RP ID の保存は確認ダイアログを挟み、取り消したら送らない', async ({ page }) => {
+      mock.on(CLIENTS_PATH, { status: 200, body: CLIENTS_BODY });
+      mock.on(allowedRpIdsPath(PROD_ID), {
+        status: 200,
+        body: { id: PROD_ID, client_id: 'prod-client-id', allowed_rp_ids: [] },
+      });
+
+      let dialogMessage = '';
+      page.on('dialog', (dialog) => {
+        dialogMessage = dialog.message();
+        return dialog.dismiss();
+      });
+
+      await page.goto('/mypage/');
+      const section = await openSection(itemOf(page, '本番サイト'), 'allowed_rp_ids');
+      await section.locator('.row-del').nth(0).click();
+      await section.getByRole('button', { name: '保存' }).click();
+
+      expect(dialogMessage).toContain('登録済みのパスキーは使えなくなり');
+      expect(mock.countTo(allowedRpIdsPath(PROD_ID))).toBe(0);
+    });
+
+    test('redirect_uri の保存は確認ダイアログを挟まない', async ({ page }) => {
+      mock.on(CLIENTS_PATH, { status: 200, body: CLIENTS_BODY });
+      mock.on(redirectUrisPath(PROD_ID), {
+        status: 200,
+        body: {
+          id: PROD_ID,
+          client_id: 'prod-client-id',
+          redirect_uris: ['https://shop.example.com/admin/ecauth/callback'],
+        },
+      });
+
+      let dialogCount = 0;
+      page.on('dialog', (dialog) => {
+        dialogCount += 1;
+        return dialog.dismiss();
+      });
+
+      await page.goto('/mypage/');
+      const section = await openSection(itemOf(page, '本番サイト'), 'redirect_uris');
+      await section.getByRole('button', { name: '保存' }).click();
+
+      await expect(section.locator('[data-status="section"]')).toHaveClass(/ok/);
+      expect(dialogCount).toBe(0);
+      expect(mock.countTo(redirectUrisPath(PROD_ID))).toBe(1);
+    });
+
+    test('「取り消し」で保存前の値に戻し、API は呼ばない', async ({ page }) => {
+      mock.on(CLIENTS_PATH, { status: 200, body: CLIENTS_BODY });
+
+      await page.goto('/mypage/');
+      const section = await openSection(itemOf(page, '本番サイト'), 'redirect_uris');
+
+      await section.locator('.row-input').nth(0).fill('https://typo.example.com/');
+      await section.locator('.row-add').click();
+      await expect(section.locator('.list-row')).toHaveCount(2);
+
+      await section.getByRole('button', { name: '取り消し' }).click();
+
+      await expect(section.locator('.list-row')).toHaveCount(1);
+      await expect(section.locator('.row-input')).toHaveValue('https://shop.example.com/admin/ecauth/callback');
+      expect(mock.countTo(redirectUrisPath(PROD_ID))).toBe(0);
+    });
+
+    test('保存中はセクションの編集操作をロックする', async ({ page }) => {
+      mock.on(CLIENTS_PATH, { status: 200, body: CLIENTS_BODY });
+
+      // 応答を保留し、リクエスト飛行中の画面状態を観測できるようにする。
+      let release: () => void = () => {};
+      const inFlight = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      mock.on(redirectUrisPath(PROD_ID), async () => {
+        await inFlight;
+        return {
+          status: 200,
+          body: {
+            id: PROD_ID,
+            client_id: 'prod-client-id',
+            redirect_uris: ['https://shop.example.com/admin/ecauth/callback'],
+          },
+        };
+      });
+
+      await page.goto('/mypage/');
+      const section = await openSection(itemOf(page, '本番サイト'), 'redirect_uris');
+      await section.locator('.row-save').click();
+
+      // 送信ボディは「保存」を押した時点のスナップショット。飛行中に編集できてしまうと、
+      // 送っていない変更が成功時の再描画で黙って消え、しかも「保存しました」と出る。
+      await expect(section.locator('.row-save')).toBeDisabled();
+      await expect(section.locator('.row-input').first()).toBeDisabled();
+      await expect(section.locator('.row-del').first()).toBeDisabled();
+      await expect(section.locator('.row-add')).toBeDisabled();
+      await expect(section.locator('.row-cancel')).toBeDisabled();
+
+      release();
+
+      await expect(section.locator('[data-status="section"]')).toHaveClass(/ok/);
+      await expect(section.locator('.row-save')).toBeEnabled();
+      await expect(section.locator('.row-input').first()).toBeEnabled();
+      await expect(section.locator('.row-del').first()).toBeEnabled();
+      await expect(section.locator('.row-add')).toBeEnabled();
+      await expect(section.locator('.row-cancel')).toBeEnabled();
+    });
+
+    test('保存中に 401 になったらログイン画面に戻す', async ({ page }) => {
+      mock.on(CLIENTS_PATH, { status: 200, body: CLIENTS_BODY });
+      mock.on(redirectUrisPath(PROD_ID), { status: 401, body: { error: 'invalid_token' } });
+
+      await page.goto('/mypage/');
+      const section = await openSection(itemOf(page, '本番サイト'), 'redirect_uris');
+      await section.getByRole('button', { name: '保存' }).click();
+
+      await expect(page.locator('#login-view')).toBeVisible();
+      expect(await readSession(page, AT_KEY)).toBeNull();
+    });
+
+    test('サーバが理由を返さない失敗は汎用メッセージにする', async ({ page }) => {
+      mock.on(CLIENTS_PATH, { status: 200, body: CLIENTS_BODY });
+      mock.on(redirectUrisPath(PROD_ID), { status: 500, body: { error: 'server_error' } });
+
+      await page.goto('/mypage/');
+      const section = await openSection(itemOf(page, '本番サイト'), 'redirect_uris');
+      await section.getByRole('button', { name: '保存' }).click();
+
+      await expect(section.locator('[data-status="section"]')).toHaveClass(/err/);
+      await expect(section.locator('[data-status="section"]')).toContainText('保存に失敗しました');
+      // 失敗しても編集を再開できる状態に戻ること。
+      await expect(section.locator('.row-input').first()).toBeEnabled();
+      await expect(section.locator('.row-add')).toBeEnabled();
+      await expect(section.locator('.row-save')).toBeEnabled();
+    });
   });
 });
