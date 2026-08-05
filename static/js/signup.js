@@ -8,7 +8,7 @@
   if (!form) return;
 
   var fEmail = App.$('#f-email'), fOrg = App.$('#f-org'), fContact = App.$('#f-contact');
-  var fProd = App.$('#f-prod'), fTest = App.$('#f-test'), fSiteRequired = App.$('#f-site-required');
+  var fProd = App.$('#f-prod'), fTest = App.$('#f-test');
   var fVersion = App.$('#f-version');
 
   function val(sel) { return App.$(sel).value.trim(); }
@@ -40,20 +40,19 @@
     var orgOk = org.length >= 1 && org.length <= 100;
     var contactOk = val('#contact') !== '';
     var prod = val('#prod'), test = val('#test');
-    var prodOk = validSiteUrl(prod);
+    // backend（ValidateSiteUrls）は本番サイトを必須とする。テストサイトだけの申込を許すと
+    // 紐づく本番の無いサンドボックス Organization ができ、後からマイページで
+    // 本番に紐づけ直せないため。テストサイトは任意（後から追加できる）。
+    var prodOk = prod !== '' && validSiteUrl(prod);
     var testOk = validSiteUrl(test);
-    // backend（ValidateSiteUrls）は本番・テストのいずれか一方を必須とする。
-    var siteRequiredOk = prod !== '' || test !== '';
 
     fEmail.classList.toggle('invalid', !emailOk);
     fOrg.classList.toggle('invalid', !orgOk);
     fContact.classList.toggle('invalid', !contactOk);
     fProd.classList.toggle('invalid', !prodOk);
     fTest.classList.toggle('invalid', !testOk);
-    // 「いずれか必須」は形式エラーが無いときだけ出す（同時に出すと原因が分かりにくい）。
-    fSiteRequired.classList.toggle('invalid', prodOk && testOk && !siteRequiredOk);
 
-    return emailOk && orgOk && contactOk && prodOk && testOk && siteRequiredOk;
+    return emailOk && orgOk && contactOk && prodOk && testOk;
   }
 
   App.$('#email').addEventListener('input', function () {
@@ -67,12 +66,11 @@
     if (this.value.trim()) fContact.classList.remove('invalid');
   });
   App.$('#prod').addEventListener('input', function () {
-    if (validSiteUrl(this.value.trim())) fProd.classList.remove('invalid');
-    if (this.value.trim()) fSiteRequired.classList.remove('invalid');
+    var v = this.value.trim();
+    if (v !== '' && validSiteUrl(v)) fProd.classList.remove('invalid');
   });
   App.$('#test').addEventListener('input', function () {
     if (validSiteUrl(this.value.trim())) fTest.classList.remove('invalid');
-    if (this.value.trim()) fSiteRequired.classList.remove('invalid');
   });
 
   form.addEventListener('submit', async function (e) {
