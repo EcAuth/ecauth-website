@@ -12,7 +12,12 @@
   var fVersion = App.$('#f-version');
 
   // baseof.html が appPage にだけ埋め込む window.ECAUTH.policyVersion（hugo.toml の params）。
-  var policyVersion = (window.ECAUTH && window.ECAUTH.policyVersion) || '1.0';
+  // 既定値へのフォールバックは置かない。設定が届かないまま "1.0" 等を送ると、利用者が
+  // 実際に読んだ文書と対応しない版数への同意が静かに記録され、後から誤りに気づけないため。
+  // 未設定は設定ミスとして送信を止める（誤った同意記録を残すより検知できる壊れ方を選ぶ）。
+  var policyVersion = (window.ECAUTH && typeof window.ECAUTH.policyVersion === 'string')
+    ? window.ECAUTH.policyVersion.trim()
+    : '';
 
   function val(sel) { return App.$(sel).value.trim(); }
 
@@ -80,6 +85,12 @@
     e.preventDefault();
     App.clearStatus(statusEl);
     if (!validate()) return;
+
+    if (!policyVersion) {
+      App.setStatus(statusEl, 'err',
+        '設定エラーのため申し込みを受け付けられません。お手数ですが時間をおいて再度お試しください。');
+      return;
+    }
 
     btn.disabled = true;
     var original = btn.textContent;

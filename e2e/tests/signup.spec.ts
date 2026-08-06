@@ -224,6 +224,36 @@ test('申込ボタンの下に利用規約・プライバシーポリシーへ�
   }
 });
 
+test('規約の版数が設定として届かなければ申し込みを送信しない', async ({ page }) => {
+  // hugo.toml の policyVersion がテンプレートから届かない設定ミスを再現する。
+  // 既定値にフォールバックすると、利用者が実際に読んだ文書と対応しない版数への同意が
+  // 静かに DB に記録され、後から誤りに気づけない。壊れるなら検知できる形で壊す。
+  await page.addInitScript(() => {
+    let stored: Record<string, unknown> | undefined;
+    Object.defineProperty(window, 'ECAUTH', {
+      configurable: true,
+      get: () => stored,
+      set: (value: Record<string, unknown> | undefined) => {
+        if (!value) {
+          stored = value;
+          return;
+        }
+        const copy = { ...value };
+        delete copy.policyVersion;
+        stored = copy;
+      },
+    });
+  });
+
+  await page.goto('/signup/');
+  await fillRequired(page);
+  await page.click('#submit-btn');
+
+  await expect(page.locator('#status')).toHaveClass(/err/);
+  await expect(page.locator('#status')).toContainText('設定エラー');
+  expect(mock.countTo(PATH)).toBe(0);
+});
+
 test('組織名が空なら API を呼ばない（backend が 1〜100 文字を必須とする）', async ({ page }) => {
   await page.goto('/signup/');
 
