@@ -11,6 +11,14 @@
   var fProd = App.$('#f-prod'), fTest = App.$('#f-test');
   var fVersion = App.$('#f-version');
 
+  // baseof.html が appPage にだけ埋め込む window.ECAUTH.policyVersion（hugo.toml の params）。
+  // 既定値へのフォールバックは置かない。設定が届かないまま "1.0" 等を送ると、利用者が
+  // 実際に読んだ文書と対応しない版数への同意が静かに記録され、後から誤りに気づけないため。
+  // 未設定は設定ミスとして送信を止める（誤った同意記録を残すより検知できる壊れ方を選ぶ）。
+  var policyVersion = (window.ECAUTH && typeof window.ECAUTH.policyVersion === 'string')
+    ? window.ECAUTH.policyVersion.trim()
+    : '';
+
   function val(sel) { return App.$(sel).value.trim(); }
 
   /*
@@ -78,18 +86,34 @@
     App.clearStatus(statusEl);
     if (!validate()) return;
 
+    if (!policyVersion) {
+      App.setStatus(statusEl, 'err',
+        '設定エラーのため申し込みを受け付けられません。お手数ですが時間をおいて再度お試しください。');
+      return;
+    }
+
     btn.disabled = true;
     var original = btn.textContent;
     btn.textContent = '送信中…';
 
     // 未入力の URL は空文字で送る（backend の NormalizeOptionalUrl が null 扱いする）。
+    //
+    // *_version は「この申込者がどの版の規約に同意したか」の記録。送らないと backend
+    // （SignupService.NormalizePolicyVersion）が既定値 "1.0" を入れてしまい、実在する
+    // 文書と対応しているのかコードからは判別できなくなる。hugo.toml の policyVersion を
+    // 唯一の出所にし、docs/terms-of-service.md・docs/privacy-policy.md の版数と揃える。
+    // Cookie に関する事項は独立した文書ではなくプライバシーポリシーの一節なので、
+    // cookie_version にも同じ版数を送る。
     var res = await App.postJson('/api/signup/request', {
       email: val('#email'),
       organization_name: val('#org'),
       contact_name: val('#contact'),
       production_site_url: val('#prod'),
       test_site_url: val('#test'),
-      ec_cube_version: selectedVersion()
+      ec_cube_version: selectedVersion(),
+      terms_version: policyVersion,
+      privacy_version: policyVersion,
+      cookie_version: policyVersion
     });
 
     btn.textContent = original;

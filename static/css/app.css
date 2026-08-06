@@ -118,6 +118,10 @@
 .btn:disabled { opacity: .55; cursor: not-allowed; }
 
 /* --- ステータス表示 --- */
+/* 申込ボタン直下の同意文言。押下＝同意なので、ボタンと視覚的に切り離さない。 */
+.consent { font-size: .82rem; color: var(--color-text-light); line-height: 1.6; margin: .6rem 0 0; text-align: center; }
+.consent a { color: var(--color-primary); }
+
 .status { margin-top: 1rem; padding: .85rem 1rem; border-radius: 8px; font-size: .92rem; line-height: 1.6; display: none; }
 .status.show { display: block; }
 .status.ok { background: rgba(5, 150, 105, .12); color: var(--color-accent); border: 1px solid rgba(5, 150, 105, .3); }

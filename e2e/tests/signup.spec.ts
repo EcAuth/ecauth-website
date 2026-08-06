@@ -163,7 +163,9 @@ test('202 で完了メッセージを表示し、フォームをリセットす�
   await expect(status).toHaveClass(/ok/);
   await expect(status).toContainText('確認メールを送信しました');
 
-  // 送信ボディが API 契約（snake_case）どおりであること
+  // 送信ボディが API 契約（snake_case）どおりであること。
+  // *_version は同意記録。送り漏れると backend が既定値を入れてしまい、実在する規約と
+  // 対応しない版数が DB に残るため、toEqual で「必ず載っていること」まで固定する。
   expect(mock.lastCallTo(PATH)?.json).toEqual({
     email: 'user@example.com',
     organization_name: 'サンプル株式会社',
@@ -171,6 +173,9 @@ test('202 で完了メッセージを表示し、フォームをリセットす�
     production_site_url: 'https://shop.example.com',
     test_site_url: 'https://test.example.com',
     ec_cube_version: '4',
+    terms_version: '1.0',
+    privacy_version: '1.0',
+    cookie_version: '1.0',
   });
 
   // 二重送信を防ぐためボタンは無効のまま、入力はクリアされる
@@ -195,6 +200,58 @@ test('EC-CUBE バージョンは既定が 4 系で、選択すると送信値が
   await expect(page.locator('#status')).toHaveClass(/ok/);
   // backend の ValidateEcCubeVersion が受理する値（"2" / "4" / "other"）であること
   expect(mock.lastCallTo(PATH)?.json?.ec_cube_version).toBe('2');
+});
+
+test('申込ボタンの下に利用規約・プライバシーポリシーへのリンクを出す', async ({ page }) => {
+  await page.goto('/signup/');
+
+  // 同意チェックボックスは置かず「押下＝同意」にしているため、ボタンを押す前に
+  // 規約へ到達できることがこのリンクの存在に懸かっている。
+  const consent = page.locator('#consent');
+  await expect(consent).toContainText('同意したものとみなします');
+
+  // サイト内ページを持たず GitHub 上の Markdown を直接見せる（hugo.toml の termsUrl / privacyUrl）。
+  const links = [
+    { name: '利用規約', href: 'https://github.com/EcAuth/ecauth-website/blob/main/docs/terms-of-service.md' },
+    { name: 'プライバシーポリシー', href: 'https://github.com/EcAuth/ecauth-website/blob/main/docs/privacy-policy.md' },
+  ];
+  for (const { name, href } of links) {
+    const link = consent.getByRole('link', { name });
+    await expect(link).toHaveAttribute('href', href);
+    // 入力途中のフォームを破棄させないため別タブで開く。
+    await expect(link).toHaveAttribute('target', '_blank');
+    await expect(link).toHaveAttribute('rel', 'noopener');
+  }
+});
+
+test('規約の版数が設定として届かなければ申し込みを送信しない', async ({ page }) => {
+  // hugo.toml の policyVersion がテンプレートから届かない設定ミスを再現する。
+  // 既定値にフォールバックすると、利用者が実際に読んだ文書と対応しない版数への同意が
+  // 静かに DB に記録され、後から誤りに気づけない。壊れるなら検知できる形で壊す。
+  await page.addInitScript(() => {
+    let stored: Record<string, unknown> | undefined;
+    Object.defineProperty(window, 'ECAUTH', {
+      configurable: true,
+      get: () => stored,
+      set: (value: Record<string, unknown> | undefined) => {
+        if (!value) {
+          stored = value;
+          return;
+        }
+        const copy = { ...value };
+        delete copy.policyVersion;
+        stored = copy;
+      },
+    });
+  });
+
+  await page.goto('/signup/');
+  await fillRequired(page);
+  await page.click('#submit-btn');
+
+  await expect(page.locator('#status')).toHaveClass(/err/);
+  await expect(page.locator('#status')).toContainText('設定エラー');
+  expect(mock.countTo(PATH)).toBe(0);
 });
 
 test('組織名が空なら API を呼ばない（backend が 1〜100 文字を必須とする）', async ({ page }) => {

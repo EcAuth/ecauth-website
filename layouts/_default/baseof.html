@@ -10,7 +10,7 @@
   </main>
   {{- partial "footer.html" . -}}
   {{ if .Params.appPage }}
-  <script>window.ECAUTH = { apiBaseUrl: {{ .Site.Params.apiBaseUrl }}, adminClientId: {{ .Site.Params.adminClientId }}, authRedirectUri: {{ .Site.Params.authRedirectUri }} };</script>
+  <script>window.ECAUTH = { apiBaseUrl: {{ .Site.Params.apiBaseUrl }}, adminClientId: {{ .Site.Params.adminClientId }}, authRedirectUri: {{ .Site.Params.authRedirectUri }}, policyVersion: {{ .Site.Params.policyVersion }} };</script>
   {{ end }}
   {{- block "scripts" . }}{{ end -}}
 </body>
