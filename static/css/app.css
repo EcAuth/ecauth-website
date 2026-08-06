@@ -61,8 +61,10 @@
 .field.invalid input { border-color: #dc2626; }
 .field.invalid .err-msg { display: block; }
 
-/* 本番／テスト URL の「いずれか必須」エラーは単独の行として出す（入力欄を持たない） */
-#f-site-required { margin-top: -1rem; }
+/* 選べない選択肢（本番サイトが上限、テストサイトの追加先が無い等）は理由と併せて伏せる */
+.field input:disabled, .field select:disabled { opacity: .6; cursor: not-allowed; background: var(--color-bg-light); }
+.radio-row label:has(input:disabled) { opacity: .55; cursor: not-allowed; }
+.radio-row input:disabled { cursor: not-allowed; }
 
 /* EC-CUBE バージョン選択 */
 .radio-row { display: flex; gap: .6rem; flex-wrap: wrap; }
@@ -106,6 +108,9 @@
 }
 .btn.primary { background: var(--color-primary); color: #fff; }
 .btn.primary:hover { background: var(--color-primary-dark); }
+/* 取り消せない操作（サイト削除）の実行ボタン。確認ブロックの中でだけ使う。 */
+.btn.danger { background: #dc2626; color: #fff; }
+.btn.danger:hover { background: #b91c1c; }
 .btn.secondary { background: transparent; color: var(--color-primary); border-color: var(--color-border); }
 .btn.secondary:hover { border-color: var(--color-primary); }
 .btn.small { padding: .5rem 1rem; font-size: .9rem; }
@@ -129,14 +134,30 @@
 .center { text-align: center; }
 .mt-2 { margin-top: 1.25rem; }
 
-/* --- マイページ: Client 一覧 / 詳細 --- */
+/* --- マイページ: サイト（Organization）一覧 --- */
+/* 1 カード = 1 サイト。カード内に、そのサイトの Client（通常 1 件）がぶら下がる。 */
 .org-select-row { display: flex; align-items: center; gap: .75rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
 .org-select-row label { font-weight: 600; white-space: nowrap; }
 .org-select-row select { flex: 1; min-width: 200px; }
 
 .client-item { border: 1px solid var(--color-border); border-radius: 10px; padding: 1.1rem 1.25rem; margin-bottom: 1rem; background: var(--color-bg); }
+/* 見出しは組織コード（= 接続先ホスト名）。組織名はアカウント内で共通なので補助行に置く。 */
 .client-item .ci-name { font-weight: 700; font-size: 1.05rem; }
-.client-item .ci-domain { color: var(--color-text-light); font-size: .88rem; margin-bottom: .75rem; }
+.client-item .ci-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
+.client-item .ci-owner { color: var(--color-text-light); font-size: .88rem; margin-bottom: .75rem; }
+
+.ci-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; }
+.ci-head .ci-name { flex: 1; min-width: 0; }
+.site-del { flex: none; }
+.site-del:hover { border-color: #dc2626; color: #dc2626; }
+
+/* テストサイトは紐づく本番サイトの直後に、インデントで従属を示して並べる。 */
+.client-item.child { margin-left: 1.5rem; border-left: 3px solid rgba(217, 119, 6, .35); }
+.client-item .ci-parent { color: var(--color-text-light); font-size: .85rem; margin: -.5rem 0 .75rem; }
+
+/* 1 サイトに Client が複数ある場合の区切り。通常は 1 件で、見出しも出ない。 */
+.ci-client + .ci-client { border-top: 1px dashed var(--color-border); margin-top: .9rem; padding-top: .7rem; }
+.ci-client-name { font-weight: 600; font-size: .92rem; margin-bottom: .4rem; }
 
 .obadge { display: inline-block; font-size: .72rem; font-weight: 700; padding: .12rem .5rem; border-radius: 999px; margin-right: .5rem; }
 .obadge.prod { background: rgba(5, 150, 105, .15); color: var(--color-accent); }
@@ -187,3 +208,19 @@
 .ci-settings .hint { font-size: .82rem; color: var(--color-text-light); line-height: 1.6; margin: .35rem 0 0; }
 .ci-settings .hint.warn { color: #d97706; }
 .ci-settings .status { margin-top: .75rem; }
+
+/* --- マイページ: サイト削除の確認 --- */
+/* 取り消せない操作なので、消えるサイトと失われるものを列挙してから実行させる。
+   window.confirm では収まらない情報量のため、カード内に展開する。 */
+.site-confirm { border: 1px solid rgba(220, 38, 38, .35); background: rgba(220, 38, 38, .06); border-radius: 8px; padding: .9rem 1rem; margin-top: .9rem; }
+.site-confirm[hidden] { display: none; }
+.sc-title { font-weight: 700; font-size: .95rem; margin: 0 0 .6rem; }
+.sc-label { font-weight: 600; font-size: .85rem; margin: 0 0 .25rem; }
+.sc-list { margin: 0 0 .6rem; padding-left: 1.3rem; font-size: .86rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
+.sc-note { font-size: .85rem; color: var(--color-text-light); line-height: 1.6; margin: 0 0 .5rem; }
+.sc-actions { display: flex; gap: .5rem; margin-top: .8rem; }
+.site-confirm .status { margin-top: .75rem; }
+
+/* --- マイページ: サイト追加 --- */
+.app-title.sub { font-size: 1.2rem; }
+#site-usage { white-space: nowrap; }

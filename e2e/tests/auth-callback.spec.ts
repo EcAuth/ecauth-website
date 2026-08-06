@@ -21,7 +21,7 @@ import {
  * 守るべき性質なので、countTo(TOKEN_PATH) === 0 を明示的に確認する。
  */
 const TOKEN_PATH = '/v1/token';
-const CLIENTS_PATH = '/v1/account/clients';
+const ORGANIZATIONS_PATH = '/v1/account/organizations';
 
 const STATE = 'state-0123456789abcdef';
 const VERIFIER = 'verifier-0123456789abcdefghijklmnopqrstuvwxyz';
@@ -31,7 +31,11 @@ let mock: ApiMock;
 
 test.beforeEach(async ({ page }) => {
   mock = await installApiMock(page);
-  mock.on(CLIENTS_PATH, { status: 200, body: { clients: [] } });
+  // 遷移先のマイページがサイト一覧を取りにいく。中身はこの spec の関心事ではない。
+  mock.on(ORGANIZATIONS_PATH, {
+    status: 200,
+    body: { organizations: [], max_sites: 10, production_site_count: 0 },
+  });
 });
 
 test.afterEach(async () => {
