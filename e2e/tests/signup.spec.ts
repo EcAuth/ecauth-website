@@ -7,7 +7,7 @@ import { ApiMock, installApiMock } from './helpers/mock';
  * 検証対象は static/js/signup.js。バックエンドは横取りしてスタブする。
  *
  * backend（SignupService.RequestAsync）の必須条件と揃っていることが要:
- *   - production_site_url / test_site_url のいずれか一方は必須
+ *   - production_site_url は必須（test_site_url は任意）
  *   - サイト URL は https:// の絶対 URL（組織コードをホスト名から導出するため）
  *   - ec_cube_version は "2" / "4" / "other"
  * ここがずれるとフォームは常に 422 になるため、送信ボディを明示的に固定する。
@@ -65,39 +65,49 @@ test('メール形式が不正なら API を呼ばず、修正すると invalid 
   await expect(page.locator('#f-email')).not.toHaveClass(/invalid/);
 });
 
-test('サイト URL が両方とも空なら API を呼ばず「いずれか必須」を表示する', async ({ page }) => {
+test('本番サイト URL が空なら API を呼ばずに弾く', async ({ page }) => {
   await page.goto('/signup/');
 
-  // サイト URL を意図的に両方とも空のままにする（fillRequired は #prod を埋めるので使わない）。
+  // 本番サイト URL を意図的に空のままにする（fillRequired は #prod を埋めるので使わない）。
   await page.fill('#email', 'user@example.com');
   await page.fill('#org', 'サンプル株式会社');
   await page.fill('#contact', '山田 太郎');
   await page.click('#submit-btn');
 
-  await expect(page.locator('#site-required-err')).toBeVisible();
-  await expect(page.locator('#f-prod')).not.toHaveClass(/invalid/);
-  await expect(page.locator('#f-test')).not.toHaveClass(/invalid/);
+  await expect(page.locator('#f-prod')).toHaveClass(/invalid/);
   expect(mock.countTo(PATH)).toBe(0);
 
-  // どちらかを入力すれば解消する
-  await page.fill('#test', 'https://test.example.com');
-  await expect(page.locator('#site-required-err')).toBeHidden();
+  // 入力すれば解消する
+  await page.fill('#prod', 'https://shop.example.com');
+  await expect(page.locator('#f-prod')).not.toHaveClass(/invalid/);
 });
 
-test('テストサイト URL だけでも申し込める（本番未構築のケース）', async ({ page }) => {
-  mock.on(PATH, { status: 202, body: { message: 'ok' } });
-
+test('テストサイト URL だけでは申し込めない', async ({ page }) => {
+  // テストサイトだけの申込を許すと、紐づく本番の無いサンドボックス Organization ができ、
+  // 後からマイページで本番に紐づけ直せない（EcAuth/EcAuth#482）。
   await page.goto('/signup/');
+
   await page.fill('#email', 'user@example.com');
   await page.fill('#org', 'サンプル株式会社');
   await page.fill('#contact', '山田 太郎');
   await page.fill('#test', 'https://test.example.com');
+  await page.click('#submit-btn');
+
+  await expect(page.locator('#f-prod')).toHaveClass(/invalid/);
+  expect(mock.countTo(PATH)).toBe(0);
+});
+
+test('テストサイト URL は任意（本番だけでも申し込める）', async ({ page }) => {
+  mock.on(PATH, { status: 202, body: { message: 'ok' } });
+
+  await page.goto('/signup/');
+  await fillRequired(page);
   await page.click('#submit-btn');
 
   await expect(page.locator('#status')).toHaveClass(/ok/);
   expect(mock.lastCallTo(PATH)?.json).toMatchObject({
-    production_site_url: '',
-    test_site_url: 'https://test.example.com',
+    production_site_url: 'https://shop.example.com',
+    test_site_url: '',
   });
 });
 

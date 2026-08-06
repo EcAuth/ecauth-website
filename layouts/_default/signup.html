@@ -27,21 +27,17 @@
       </div>
 
       <div class="field" id="f-prod">
-        <label for="prod">本番サイト URL <span class="opt">（本番・テストのいずれか必須）</span></label>
-        <input type="url" id="prod" name="prod" placeholder="https://example.jp" inputmode="url" autocomplete="url" aria-describedby="prod-hint prod-err">
-        <div class="hint" id="prod-hint">https:// で始まる本番ドメインを入力してください。組織コードはこのドメインから自動生成されます。</div>
+        <label for="prod">本番サイト URL<span class="req">*</span></label>
+        <input type="url" id="prod" name="prod" placeholder="https://example.jp" inputmode="url" autocomplete="url" aria-describedby="prod-hint prod-err" required>
+        <div class="hint" id="prod-hint">https:// で始まる本番ドメインを入力してください。組織コードはこのドメインから自動生成されます。まだ本番サイトを公開していない場合も、予定しているドメインを入力してください。</div>
         <div class="err-msg" id="prod-err" role="alert">https:// で始まる有効な URL を入力してください。</div>
       </div>
 
       <div class="field" id="f-test">
-        <label for="test">テストサイト URL <span class="opt">（本番・テストのいずれか必須）</span></label>
+        <label for="test">テストサイト URL <span class="opt">（任意）</span></label>
         <input type="url" id="test" name="test" placeholder="https://test.example.jp" inputmode="url" autocomplete="url" aria-describedby="test-hint test-err">
-        <div class="hint" id="test-hint">検証環境がある場合に入力してください。本番サイトが未構築の場合はこちらだけでもお申し込みいただけます。</div>
+        <div class="hint" id="test-hint">検証環境がある場合に入力してください。</div>
         <div class="err-msg" id="test-err" role="alert">https:// で始まる有効な URL を入力してください。</div>
-      </div>
-
-      <div class="field" id="f-site-required">
-        <div class="err-msg" id="site-required-err" role="alert">本番・テストのいずれか一方の URL を入力してください。</div>
       </div>
 
       <div class="field" id="f-version">
