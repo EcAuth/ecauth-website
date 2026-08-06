@@ -889,6 +889,27 @@ test.describe('認証済', () => {
       await expect(page.locator('#add-btn')).toBeEnabled();
     });
 
+    test('追加後の一覧再取得に失敗したら、見えない場所に完了メッセージを残さない', async ({ page }) => {
+      // 再取得に失敗すると追加フォームごと隠れる（上限も親候補も分からないため）。
+      // そこに成功状態を書くと、次に一覧が復帰したとき古いメッセージが出てしまう。
+      let listFails = false;
+      stubOrganizations(
+        () => (listFails ? { status: 500, body: { error: 'server_error' } } : { status: 200, body: DEFAULT_BODY }),
+        () => {
+          listFails = true;
+          return { status: 201, body: { id: ADDED_ORG_ID, code: 'added-example-jp', is_sandbox: false } };
+        }
+      );
+
+      await page.goto('/mypage/');
+      await page.fill('#add-url', 'https://added.example.jp/');
+      await page.click('#add-btn');
+
+      await expect(page.locator('#list-status')).toHaveClass(/err/);
+      await expect(page.locator('#add-card')).toBeHidden();
+      await expect(page.locator('#add-status')).not.toHaveClass(/ok/);
+    });
+
     test('エラー文言に HTML が含まれてもテキストとして描画する（XSS 回避）', async ({ page }) => {
       stubOrganizations({ status: 200, body: DEFAULT_BODY }, () => ({
         status: 422,
@@ -1045,6 +1066,32 @@ test.describe('認証済', () => {
       await expect(page.locator('.client-item')).toHaveCount(1);
       // テスト枠が空くので、テストサイトを再び選べるようになる。
       await expect(page.locator('#add-kind-sandbox')).toBeEnabled();
+    });
+
+    test('削除後の一覧再取得に失敗したら、完了ではなく取得エラーを残す', async ({ page }) => {
+      // 削除自体は成功しているが、直後の再取得が落ちると画面は古い一覧のまま。
+      // ここで「削除しました」を書くと、削除済みのカードが残ったまま完了と表示され、
+      // しかも App.setStatus は className ごと差し替えるので取得エラーの理由まで消える。
+      let listFails = false;
+      stubOrganizations(() =>
+        listFails ? { status: 500, body: { error: 'server_error' } } : { status: 200, body: DEFAULT_BODY }
+      );
+      mock.on(deletePath(PROD_ORG_ID), () => {
+        listFails = true;
+        return { status: 200, body: { deleted_organization_ids: [PROD_ORG_ID, SANDBOX_ORG_ID] } };
+      });
+
+      await page.goto('/mypage/');
+      const prod = itemOf(page, PROD_ORG_ID);
+      await prod.getByRole('button', { name: /削除/ }).click();
+      await confirmOf(prod).getByRole('button', { name: '削除する' }).click();
+
+      const status = page.locator('#list-status');
+      await expect(status).toHaveClass(/err/);
+      await expect(status).toContainText('サイト情報の取得に失敗しました');
+      await expect(status).not.toContainText('削除しました');
+      // 画面は古い一覧のまま。利用者から見て「消えていない」状態と表示が食い違わないこと。
+      await expect(page.locator('.client-item')).toHaveCount(2);
     });
 
     test('削除に失敗したら確認ブロック内に理由を出し、やり直せる状態に戻す', async ({ page }) => {

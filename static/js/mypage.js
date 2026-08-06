@@ -497,7 +497,9 @@
         ? res.data.deleted_organization_ids.length : targets.length;
 
       // 再読込でこのカードごと消える。完了メッセージは一覧側に出す。
-      await loadSites();
+      // 再取得に失敗したときは書かない。古いカードが残ったまま「削除しました」と出ると
+      // 削除できていないように見え、loadSites が出したエラーの理由まで消えるため。
+      if (!(await loadSites())) return;
       App.setStatus(listStatus, 'ok', deleted > 1
         ? 'サイトを削除しました（紐づくテストサイトを含む ' + deleted + ' 件）。'
         : 'サイトを削除しました。');
@@ -780,21 +782,32 @@
     addUrlField.classList.remove('invalid');
     // 上限・親候補・一覧は追加で変わる。再読込して syncAddForm に反映させる
     // （addBtn の disabled もそこで決まる）。
-    await loadSites();
+    // 再取得に失敗したときは完了メッセージを書かない。loadSites がフォームごと隠すため
+    // 見えない場所に成功状態が残り、次に一覧が復帰したときに古いメッセージが出てしまう。
+    // 失敗の理由は loadSites が一覧側に出している。
+    if (!(await loadSites())) return;
     App.setStatus(addStatus, 'ok',
       'サイトを追加しました。上の一覧から Client ID / Client Secret を確認し、'
         + 'EC-CUBE プラグインに設定してください。');
   });
 
+  /*
+   * サイト一覧を取り直して描画する。
+   *
+   * 戻り値は「画面が最新の一覧を映しているか」。追加・削除の後に完了メッセージを出す
+   * 判断に使う。取得に失敗したときは古いカードを残したままエラーを出すので、呼び出し側が
+   * 成否を見ずに完了メッセージを書くと、削除済みのカードが残ったまま「削除しました」と
+   * 表示され、エラーの理由まで消える（App.setStatus は className ごと差し替えるため）。
+   */
   async function loadSites() {
     var res = await authFetch('GET', '/v1/account/organizations');
-    if (res.status === 401) { requireLogin(); return; }
+    if (res.status === 401) { requireLogin(); return false; }
     if (!res.ok || !res.data) {
       hide(loading); show(appView);
       App.setStatus(listStatus, 'err', 'サイト情報の取得に失敗しました。時間をおいて再度お試しください。');
       // 上限も親候補も分からない状態では、追加しても弾かれるだけなのでフォームは出さない。
       hide(addCard);
-      return;
+      return false;
     }
     hide(loading); show(appView); show(addCard);
 
@@ -802,6 +815,7 @@
     maxSites = typeof res.data.max_sites === 'number' ? res.data.max_sites : 0;
     renderSites(organizations);
     syncAddForm();
+    return true;
   }
 
   // --- 初期化 ---
