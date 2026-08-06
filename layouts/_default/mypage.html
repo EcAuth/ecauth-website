@@ -12,14 +12,58 @@
     <p class="center mt-2"><a class="muted-link" href="/signin/">パスキーが使えない方はこちら</a></p>
   </div>
 
-  <!-- 認証済: Client 一覧 -->
+  <!-- 認証済: サイト（Organization）一覧 -->
   <div id="app-view" style="display:none">
     <div class="app-card">
-      <h1 class="app-title">Client 情報</h1>
-      <p class="app-lead">EC-CUBE プラグインに設定する Client ID / Client Secret です。<strong>本番サイト</strong>と<strong>テストサイト</strong>で別々に設定してください。各サイトの<strong>コールバック URL</strong>と<strong>パスキーのドメイン</strong>も、それぞれの欄を開いて変更できます。</p>
-      <div id="clients"></div>
+      <h1 class="app-title">サイト一覧</h1>
+      <p class="app-lead">サイトごとに、EC-CUBE プラグインに設定する <strong>Client ID</strong> / <strong>Client Secret</strong> を発行しています。<strong>本番サイト</strong>と<strong>テストサイト</strong>で別々に設定してください。各サイトの<strong>コールバック URL</strong>と<strong>パスキーのドメイン</strong>も、それぞれの欄を開いて変更できます。</p>
+      <div id="sites"></div>
       <div class="status" id="list-status" role="status" aria-live="polite"></div>
     </div>
+
+    <!-- サイト追加 -->
+    <div class="app-card" id="add-card">
+      <h2 class="app-title sub">サイトを追加</h2>
+      <p class="app-lead">登録済みの本番サイト <strong id="site-usage">–</strong>。テストサイトは本番サイト 1 件につき 1 件まで登録でき、この件数には数えません。</p>
+
+      <form id="add-form" novalidate>
+        <div class="field" id="f-add-kind">
+          <label id="add-kind-label">サイトの種別<span class="req">*</span></label>
+          <div class="radio-row" role="radiogroup" aria-labelledby="add-kind-label">
+            <label><input type="radio" name="add_kind" value="production" id="add-kind-production" checked><span>本番サイト</span></label>
+            <label><input type="radio" name="add_kind" value="sandbox" id="add-kind-sandbox"><span>テストサイト</span></label>
+          </div>
+          <div class="hint" id="add-kind-hint"></div>
+        </div>
+
+        <div class="field" id="f-add-parent" style="display:none">
+          <label for="add-parent">紐づける本番サイト<span class="req">*</span></label>
+          <select id="add-parent" aria-describedby="add-parent-hint"></select>
+          <div class="hint" id="add-parent-hint">このテストサイトの検証対象になる本番サイトを選んでください。本番サイトを削除すると、紐づくテストサイトも一緒に削除されます。</div>
+        </div>
+
+        <div class="field" id="f-add-url">
+          <label for="add-url">サイト URL<span class="req">*</span></label>
+          <input type="url" id="add-url" name="add_url" placeholder="https://example.jp" inputmode="url" autocomplete="off" aria-describedby="add-url-hint add-url-err">
+          <div class="hint" id="add-url-hint">https:// で始まる URL を入力してください。組織コードはこのドメインから自動生成されます。テストサイトは本番サイトと同じドメインでも登録できます。</div>
+          <div class="err-msg" id="add-url-err" role="alert">https:// で始まる有効な URL を入力してください。</div>
+        </div>
+
+        <div class="field" id="f-add-version">
+          <label id="add-version-label">ご利用の EC プラットフォーム<span class="req">*</span></label>
+          <div class="radio-row" role="radiogroup" aria-labelledby="add-version-label">
+            <label><input type="radio" name="add_version" value="4" checked><span>EC-CUBE 4 系</span></label>
+            <label><input type="radio" name="add_version" value="2"><span>EC-CUBE 2 系</span></label>
+            <label><input type="radio" name="add_version" value="other"><span>EC-CUBE 以外</span></label>
+          </div>
+          <div class="hint">コールバック URL の初期値がバージョンによって変わります。追加後に変更できます。</div>
+        </div>
+
+        <button type="submit" class="btn primary block" id="add-btn">サイトを追加</button>
+        <div class="status" id="add-status" role="status" aria-live="polite"></div>
+      </form>
+    </div>
+
     <div class="app-card next-step">
       <h3>次のステップ</h3>
       <p class="app-lead" style="margin:0">EC-CUBE 管理画面の「EcAuth 設定」に、上記の Client ID / Client Secret を入力してください。設定後、管理者用パスキーの登録に進めます。パスキーの登録・ログインが失敗する場合は、コールバック URL とパスキーのドメインが管理画面の URL と一致しているか確認してください。</p>

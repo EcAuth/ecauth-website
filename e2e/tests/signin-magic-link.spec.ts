@@ -11,15 +11,18 @@ import { AT_KEY, ApiMock, installApiMock, readSession } from './helpers/mock';
  * マイページと同じ sessionStorage キーに置いて遷移する。
  */
 const PATH = '/api/account/magic-link/verify';
-const CLIENTS_PATH = '/v1/account/clients';
+const ORGANIZATIONS_PATH = '/v1/account/organizations';
 const TOKEN = 'magic-token-abcdef0123456789';
 
 let mock: ApiMock;
 
 test.beforeEach(async ({ page }) => {
   mock = await installApiMock(page);
-  // 成功時は /mypage/ へ遷移し、マイページが一覧を取りにいく。
-  mock.on(CLIENTS_PATH, { status: 200, body: { clients: [] } });
+  // 成功時は /mypage/ へ遷移し、マイページがサイト一覧を取りにいく。
+  mock.on(ORGANIZATIONS_PATH, {
+    status: 200,
+    body: { organizations: [], max_sites: 10, production_site_count: 0 },
+  });
 });
 
 test.afterEach(async () => {
@@ -58,7 +61,7 @@ test('verify が返したアクセストークンを保存してマイページ�
   expect(await readSession(page, AT_KEY)).toBe('at-from-magic-link');
   // 認証済みとして扱われ、一覧取得が走る
   await expect(page.locator('#app-view')).toBeVisible();
-  expect(mock.countTo(CLIENTS_PATH)).toBe(1);
+  expect(mock.countTo(ORGANIZATIONS_PATH)).toBe(1);
 });
 
 test('遷移は replace で行い、消費済みトークンの URL に戻れないようにする', async ({ page }) => {
