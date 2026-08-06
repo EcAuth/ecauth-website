@@ -20,6 +20,16 @@ disableKinds = ["taxonomy", "term"]
   # EC-CUBE オーナーズストアのプラグイン配布ページ（4.2/4.3系）。
   # ヘッダー／フッター／トップページから参照するため、URL はここで一元管理する。
   pluginStoreUrl = "https://www.ec-cube.net/products/detail.php?product_id=3557"
+  # 利用規約・プライバシーポリシー。サイト内ページにせず GitHub 上の Markdown を直接見せる。
+  # 掲載口を一つに絞って管理コストを下げ、改定時に利用者が差分（コミット履歴）を追えるようにするため。
+  # docs/ は Hugo のビルド対象外なので、この URL からしか到達しない。
+  termsUrl = "https://github.com/EcAuth/ecauth-website/blob/main/docs/terms-of-service.md"
+  privacyUrl = "https://github.com/EcAuth/ecauth-website/blob/main/docs/privacy-policy.md"
+  # 申込時に同意記録として送る規約の版数（POST /api/signup/request の terms_version /
+  # privacy_version / cookie_version）。Cookie に関する事項はプライバシーポリシー内の
+  # 独立した文書ではなく一節なので、3 つとも同じ版数を送る。
+  # 規約を改定したら docs/*.md の版数表・改定履歴とこの値を必ず揃えること。
+  policyVersion = "1.0"
 
 [markup.goldmark.renderer]
   unsafe = true

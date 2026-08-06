@@ -11,6 +11,9 @@
   var fProd = App.$('#f-prod'), fTest = App.$('#f-test');
   var fVersion = App.$('#f-version');
 
+  // baseof.html が appPage にだけ埋め込む window.ECAUTH.policyVersion（hugo.toml の params）。
+  var policyVersion = (window.ECAUTH && window.ECAUTH.policyVersion) || '1.0';
+
   function val(sel) { return App.$(sel).value.trim(); }
 
   /*
@@ -83,13 +86,23 @@
     btn.textContent = '送信中…';
 
     // 未入力の URL は空文字で送る（backend の NormalizeOptionalUrl が null 扱いする）。
+    //
+    // *_version は「この申込者がどの版の規約に同意したか」の記録。送らないと backend
+    // （SignupService.NormalizePolicyVersion）が既定値 "1.0" を入れてしまい、実在する
+    // 文書と対応しているのかコードからは判別できなくなる。hugo.toml の policyVersion を
+    // 唯一の出所にし、docs/terms-of-service.md・docs/privacy-policy.md の版数と揃える。
+    // Cookie に関する事項は独立した文書ではなくプライバシーポリシーの一節なので、
+    // cookie_version にも同じ版数を送る。
     var res = await App.postJson('/api/signup/request', {
       email: val('#email'),
       organization_name: val('#org'),
       contact_name: val('#contact'),
       production_site_url: val('#prod'),
       test_site_url: val('#test'),
-      ec_cube_version: selectedVersion()
+      ec_cube_version: selectedVersion(),
+      terms_version: policyVersion,
+      privacy_version: policyVersion,
+      cookie_version: policyVersion
     });
 
     btn.textContent = original;
