@@ -9,6 +9,7 @@
     {{- block "main" . }}{{ end -}}
   </main>
   {{- partial "footer.html" . -}}
+  {{- partial "contact-button.html" . -}}
   {{ if .Params.appPage }}
   <script>window.ECAUTH = { apiBaseUrl: {{ .Site.Params.apiBaseUrl }}, adminClientId: {{ .Site.Params.adminClientId }}, authRedirectUri: {{ .Site.Params.authRedirectUri }}, policyVersion: {{ .Site.Params.policyVersion }} };</script>
   {{ end }}
