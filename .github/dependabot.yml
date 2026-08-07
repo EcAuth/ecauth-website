@@ -16,11 +16,52 @@ updates:
     commit-message:
       prefix: "chore"
       include: "scope"
-    # 公式 actions/* を 1 PR に集約（major は個別 PR を維持）
+    # minor/patch と major の 2 PR に集約する。
+    # patterns を "*" にしているのは、サードパーティ actions
+    # （anthropics/* 1password/* peaceiris/* cloudflare/* pnpm/* 等）を
+    # 取りこぼさないため。
     groups:
-      actions-minor-patch:
+      github-actions-minor:
         patterns:
-          - "actions/*"
+          - "*"
         update-types:
           - "minor"
           - "patch"
+      github-actions-major:
+        patterns:
+          - "*"
+        update-types:
+          - "major"
+
+  # E2E テストの npm パッケージの自動更新
+  # e2e/ は Playwright の E2E スイート。Hugo 本体は npm 管理外。
+  - package-ecosystem: "npm"
+    directory: "/e2e"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+      time: "09:00"
+      timezone: "Asia/Tokyo"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "npm"
+      - "e2e-tests"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    # 開発依存関係も含める
+    allow:
+      - dependency-type: "all"
+    groups:
+      npm-minor:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+      npm-major:
+        patterns:
+          - "*"
+        update-types:
+          - "major"
