@@ -15,8 +15,8 @@
   --color-bg-light: #f9fafb;
   --color-border: #e5e7eb;
   --color-accent: #059669;
-  --color-contact: #ea580c;
-  --color-contact-dark: #c2410c;
+  --color-contact: #059669;
+  --color-contact-dark: #047857;
 }
 
 body {
@@ -526,7 +526,7 @@ body {
   text-decoration: none;
   font-size: 0.875rem;
   font-weight: 600;
-  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.4);
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.4);
   transition: background-color 0.15s, transform 0.15s;
 }
 
