@@ -28,7 +28,7 @@ disableKinds = ["taxonomy", "term"]
   # お問い合わせ Google フォームの URL。空のままだとフローティングボタン／フッターリンクは
   # 描画されない（フォーム未作成でもサイトが壊れないようにするため）。
   # 作成手順と Slack 通知の設定は docs/contact-form-setup.md を参照。
-  contactFormUrl = ""
+  contactFormUrl = "https://forms.gle/2eP4NXbPLPfMzMtw6"
   # 申込時に同意記録として送る規約の版数（POST /api/signup/request の terms_version /
   # privacy_version / cookie_version）。Cookie に関する事項はプライバシーポリシー内の
   # 独立した文書ではなく一節なので、3 つとも同じ版数を送る。
