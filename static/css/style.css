@@ -232,10 +232,12 @@ body {
   margin-bottom: 2rem;
 }
 
-/* 提供中プラグインの一覧。カード幅が 320px を割ると auto-fit が 1 カラムへ畳む */
+/* 提供中プラグインの一覧。カード幅が 320px を割ると auto-fit が 1 カラムへ畳む。
+   min() を挟むのは、コンテナ自体が 320px 未満（320px 幅の端末など）のときに
+   トラックが 320px のまま居座って横スクロールを生むのを防ぐため */
 .plugin-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
   gap: 1rem;
 }
 
