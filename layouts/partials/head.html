@@ -35,11 +35,26 @@
     },
     {
       "@type": "SoftwareApplication",
-      "name": "【パスキー対応】EcAuth プラグイン(4.2/4.3系)",
+      "name": "【パスキー対応】EcAuth プラグイン (4.2/4.3系)",
       "applicationCategory": "SecurityApplication",
       "operatingSystem": "Web",
       "softwareRequirements": "EC-CUBE 4.2系 / 4.3系",
-      "downloadUrl": "{{ .Site.Params.pluginStoreUrl }}",
+      "downloadUrl": "{{ .Site.Params.pluginStoreUrl4x }}",
+      "description": "EC-CUBE管理画面にパスキー認証（WebAuthn/FIDO2）を導入するプラグイン",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "JPY",
+        "description": "プラグイン自体は無料。5ユーザーまで無料、6ユーザー以上は100円/ユーザー/月。"
+      }
+    },
+    {
+      "@type": "SoftwareApplication",
+      "name": "【パスキー対応】EcAuth プラグイン (2.17/2.25系)",
+      "applicationCategory": "SecurityApplication",
+      "operatingSystem": "Web",
+      "softwareRequirements": "EC-CUBE 2.17系 / 2.25系",
+      "downloadUrl": "{{ .Site.Params.pluginStoreUrl2x }}",
       "description": "EC-CUBE管理画面にパスキー認証（WebAuthn/FIDO2）を導入するプラグイン",
       "offers": {
         "@type": "Offer",

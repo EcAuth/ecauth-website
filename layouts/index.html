@@ -4,7 +4,7 @@
   <p class="tagline">フィッシング対策認証を、プラグインひとつで。</p>
   <div class="hero-actions">
     <a href="/signup/" class="btn-cta primary">無料で申し込む</a>
-    <a href="{{ .Site.Params.pluginStoreUrl }}" class="btn-cta secondary" rel="noopener">プラグインを入手する</a>
+    <a href="#plugin" class="btn-cta secondary">プラグインを入手する</a>
   </div>
   <p class="hero-note">5ユーザーまで無料。プラグインのダウンロードも無料です。</p>
 </section>
@@ -13,30 +13,39 @@
   {{ .Content }}
 </section>
 
-<section class="plugin">
+<section class="plugin" id="plugin">
   <div class="plugin-inner">
     <h2>EC-CUBE プラグイン</h2>
     <p class="section-lead">EC-CUBE オーナーズストアから無料でダウンロードできます。</p>
 
-    <div class="plugin-card">
-      <span class="pill available">提供中</span>
-      <h3>【パスキー対応】EcAuth プラグイン(4.2/4.3系)</h3>
-      <p class="plugin-versions">
-        対応バージョン: EC-CUBE 4.3系（4.3.0 / 4.3.1 / 4.3.1-p1）、4.2系（4.2.0 〜 4.2.3-p2）
-      </p>
-      <a href="{{ .Site.Params.pluginStoreUrl }}" class="btn-cta primary" rel="noopener">
-        オーナーズストアで入手する &rarr;
-      </a>
-      <p class="plugin-meta">提供: スキルニル株式会社 ／ ダウンロード無料</p>
+    <div class="plugin-grid">
+      <div class="plugin-card">
+        <span class="pill available">提供中</span>
+        <h3>【パスキー対応】EcAuth プラグイン (4.2/4.3系)</h3>
+        <p class="plugin-versions">
+          対応バージョン: EC-CUBE 4.3系（4.3.0 / 4.3.1 / 4.3.1-p1）、4.2系（4.2.0 〜 4.2.3-p2）
+        </p>
+        <a href="{{ .Site.Params.pluginStoreUrl4x }}" class="btn-cta primary" rel="noopener">
+          オーナーズストアで入手する &rarr;
+        </a>
+        <p class="plugin-meta">提供: スキルニル株式会社 ／ ダウンロード無料</p>
+      </div>
+
+      <div class="plugin-card">
+        <span class="pill available">提供中</span>
+        <h3>【パスキー対応】EcAuth プラグイン (2.17/2.25系)</h3>
+        <p class="plugin-versions">
+          対応バージョン: EC-CUBE 2.25系（2.25.0）、2.17系（2.17.0 〜 2.17.2-p2）
+        </p>
+        <a href="{{ .Site.Params.pluginStoreUrl2x }}" class="btn-cta primary" rel="noopener">
+          オーナーズストアで入手する &rarr;
+        </a>
+        <p class="plugin-meta">提供: スキルニル株式会社 ／ ダウンロード無料</p>
+      </div>
     </div>
 
     <h3 class="upcoming-title">リリース予定</h3>
     <ul class="upcoming-list">
-      <li>
-        <span class="pill upcoming">準備中</span>
-        <strong>EC-CUBE 2系</strong>
-        <span class="upcoming-desc">2.17 / 2.25 対応版</span>
-      </li>
       <li>
         <span class="pill upcoming">準備中</span>
         <strong>EC-CUBE 4.0/4.1系</strong>

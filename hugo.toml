@@ -17,9 +17,12 @@ disableKinds = ["taxonomy", "term"]
   # 認可リクエストとトークン交換の両方でこの値を使い、アドレスバーの実 URL には依存させない。
   # ローカルは deploy/実行時に HUGO_PARAMS_AUTHREDIRECTURI で上書きする。
   authRedirectUri = "https://ec-auth.io/auth/callback"
-  # EC-CUBE オーナーズストアのプラグイン配布ページ（4.2/4.3系）。
-  # ヘッダー／フッター／トップページから参照するため、URL はここで一元管理する。
-  pluginStoreUrl = "https://www.ec-cube.net/products/detail.php?product_id=3557"
+  # EC-CUBE オーナーズストアのプラグイン配布ページ。商品ごとに 1 変数持つ。
+  # 商品が複数ある以上、ヘッダー／フッター／ヒーローの「プラグイン」導線は
+  # どれか一方を選べないため、トップページのプラグインセクション（/#plugin）へ送る。
+  # ここの URL を直接参照するのは index.html の各カードだけ。
+  pluginStoreUrl4x = "https://www.ec-cube.net/products/detail.php?product_id=3557"
+  pluginStoreUrl2x = "https://www.ec-cube.net/products/detail.php?product_id=3570"
   # 利用規約・プライバシーポリシー。サイト内ページにせず GitHub 上の Markdown を直接見せる。
   # 掲載口を一つに絞って管理コストを下げ、改定時に利用者が差分（コミット履歴）を追えるようにするため。
   # docs/ は Hugo のビルド対象外なので、この URL からしか到達しない。
