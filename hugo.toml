@@ -6,7 +6,11 @@ disableKinds = ["taxonomy", "term"]
 
 [params]
   description = "EC-CUBE管理画面のセキュリティを強化するパスキー認証サービス。5ユーザーまで無料。"
+  # SNS カード（og:image / twitter:image）。実体は 1200x630 PNG で、マスター SVG は
+  # EcAuthDocs の html/assets/logo/ecauth-og-1200x630.svg（ロゴ・ブランド資産の正典）。
+  # 差し替え時は head.html の og:image:width / height / type も合わせて更新する。
   ogImage = "/images/og-image.png"
+  ogImageAlt = "EcAuth — EC-CUBE向けパスキー認証サービス"
   # マイページ／申込フォームが叩く EcAuth 認証 API のベース URL。
   # 本番 = accounts.ec-auth.io / stg = deploy.yml の HUGO_PARAMS_APIBASEURL で上書き。
   # 生 Azure URL はここに書かない。

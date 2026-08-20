@@ -9,13 +9,29 @@
 <meta property="og:description" content="{{ .Site.Params.description }}">
 <meta property="og:type" content="website">
 <meta property="og:url" content="{{ .Permalink }}">
-{{ with .Site.Params.ogImage }}<meta property="og:image" content="{{ . | absURL }}">{{ end }}
+<meta property="og:site_name" content="EcAuth">
+{{ with .Site.Params.ogImage }}
+{{/* og:image は絶対 URL 必須（クローラは相対パスを解決しない）。
+     width/height/type は hugo.toml の ogImage が指す実ファイル（1200x630 PNG）に対応する固定値。
+     画像を差し替えるときはここも合わせて更新する。 */}}
+<meta property="og:image" content="{{ . | absURL }}">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="{{ $.Site.Params.ogImageAlt }}">
+{{ end }}
 <meta property="og:locale" content="ja_JP">
 
 <!-- Twitter Card -->
+{{/* summary_large_image は twitter:image が無いと画像なしカードにフォールバックするため、
+     og:image と同じ画像を明示する（X は og:image も見るが、明示の方が確実）。 */}}
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="{{ .Title }}">
 <meta name="twitter:description" content="{{ .Site.Params.description }}">
+{{ with .Site.Params.ogImage }}
+<meta name="twitter:image" content="{{ . | absURL }}">
+<meta name="twitter:image:alt" content="{{ $.Site.Params.ogImageAlt }}">
+{{ end }}
 
 <!-- JSON-LD -->
 <script type="application/ld+json">
