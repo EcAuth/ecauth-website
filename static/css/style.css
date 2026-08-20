@@ -169,6 +169,16 @@ body {
   color: var(--color-primary);
 }
 
+/* お問い合わせ導線はフローティングボタン／フッターと同じ緑で統一する */
+.btn-cta.contact {
+  background: var(--color-contact);
+  color: #fff;
+}
+
+.btn-cta.contact:hover {
+  background: var(--color-contact-dark);
+}
+
 /* Features */
 .features {
   max-width: 720px;
@@ -327,6 +337,50 @@ body {
   margin-top: 1rem;
   font-size: 0.8125rem;
   color: var(--color-text-light);
+}
+
+/* Other systems */
+.other-systems {
+  padding: 3rem 1.5rem;
+}
+
+.other-systems-inner {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.other-systems h2 {
+  font-size: 1.5rem;
+  text-align: center;
+  margin-bottom: 0.5rem;
+}
+
+.other-systems-list {
+  list-style: none;
+  display: grid;
+  gap: 1rem;
+}
+
+.other-systems-list li {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+}
+
+.other-systems-list strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: var(--color-primary);
+}
+
+.other-systems-list span {
+  font-size: 0.9rem;
+  color: var(--color-text-light);
+}
+
+.other-systems-actions {
+  margin-top: 1.5rem;
+  text-align: center;
 }
 
 /* Steps */

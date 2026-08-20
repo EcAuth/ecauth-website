@@ -4,7 +4,7 @@
 
 ## サービス概要
 
-EcAuthは、EC-CUBEにパスキー認証やソーシャルログインを導入するIdentity Providerサービスです。フィッシング攻撃から管理画面を保護し、パスワードに代わる安全な認証を提供します。
+EcAuthは、EC-CUBEにパスキー認証やソーシャルログインを導入するIdentity Providerサービスです。フィッシング攻撃から管理画面を保護し、パスワードに代わる安全な認証を提供します。OAuth2 / OpenID Connectをベースにしているため、EC-CUBE以外のシステム（自社開発のECサイト・会員サイト、社内業務システム、他のCMS等）にも導入できます。導入方法は個別対応となるため、問い合わせフォームから相談できます。
 
 ## ロードマップ
 
@@ -39,6 +39,14 @@ EcAuthは、EC-CUBEにパスキー認証やソーシャルログインを導入�
 - EC-CUBE 4.0系 / 4.1系
 - EC-CUBE 4.4系
 
+### EC-CUBE以外のシステム
+
+EC-CUBEプラグインは接続方法のひとつであり、ログイン機能を持つシステムであればプラットフォームを問わず導入できます。実装言語やフレームワークの制約はなく、既存のログイン方式との併用も可能です。必要な実装はシステム構成によって異なるため、個別にご案内しています（[お問い合わせフォーム](https://forms.gle/2eP4NXbPLPfMzMtw6)）。
+
+- 自社開発のECサイト・会員サイト（スクラッチ開発／他のECパッケージ）
+- 社内の業務システム・管理ツール
+- 他のCMS・Webアプリケーション
+
 ## 導入方法
 
 1. [EcAuthに申し込み](https://ec-auth.io/signup/)（Organization作成）
@@ -62,5 +70,6 @@ EcAuthは、EC-CUBEにパスキー認証やソーシャルログインを導入�
 - [EC-CUBEオーナーズストア（4.2/4.3系）](https://www.ec-cube.net/products/detail.php?product_id=3557): 4.2/4.3系プラグインの配布ページ
 - [EC-CUBEオーナーズストア（2.17/2.25系）](https://www.ec-cube.net/products/detail.php?product_id=3570): 2.17/2.25系プラグインの配布ページ
 - [GitHub](https://github.com/EcAuth): 開発状況・ソースコード
+- [お問い合わせ・ご要望フォーム](https://forms.gle/2eP4NXbPLPfMzMtw6): 導入相談・技術的な質問の窓口
 - [EC-CUBE 4系プラグイン](https://github.com/EcAuth/ec-cube4-ecauth): リポジトリ
 - [EC-CUBE 2系プラグイン](https://github.com/EcAuth/ec-cube2-ecauth): リポジトリ
