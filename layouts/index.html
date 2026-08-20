@@ -61,6 +61,45 @@
   </div>
 </section>
 
+<section class="other-systems" id="other-systems">
+  <div class="other-systems-inner">
+    <h2>EC-CUBE 以外のシステムにも導入できます</h2>
+    <p class="section-lead">
+      EcAuth は OAuth2 / OpenID Connect をベースにした認証基盤（Identity Provider）です。
+      EC-CUBE プラグインは接続方法のひとつにすぎず、ログイン機能を持つシステムであれば
+      プラットフォームを問わず組み込めます。
+    </p>
+
+    <ul class="other-systems-list">
+      <li>
+        <strong>自社開発の EC サイト・会員サイト</strong>
+        <span>スクラッチ開発や他の EC パッケージでも、ログイン画面にパスキー認証を追加できます。</span>
+      </li>
+      <li>
+        <strong>社内の業務システム・管理ツール</strong>
+        <span>管理者・スタッフのログインをパスワードレス化し、フィッシング被害を防ぎます。</span>
+      </li>
+      <li>
+        <strong>他の CMS・Web アプリケーション</strong>
+        <span>実装言語やフレームワークは問いません。既存のログイン方式と併用しての導入も可能です。</span>
+      </li>
+    </ul>
+
+    <p class="note">
+      必要な実装はシステムの構成によって異なるため、個別にご案内しています。
+      「自分たちのシステムでも使えるか知りたい」といった技術的なご質問だけでも歓迎です。お気軽にご相談ください。
+    </p>
+
+    {{- with .Site.Params.contactFormUrl }}
+    <div class="other-systems-actions">
+      <a href="{{ . }}" class="btn-cta contact" target="_blank" rel="noopener">
+        導入について相談する &rarr;
+      </a>
+    </div>
+    {{- end }}
+  </div>
+</section>
+
 <section class="steps">
   <h2>ご利用の流れ</h2>
   <ol class="step-list">
