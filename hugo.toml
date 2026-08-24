@@ -25,7 +25,9 @@ disableKinds = ["taxonomy", "term"]
   # 商品が複数ある以上、ヘッダー／フッター／ヒーローの「プラグイン」導線は
   # どれか一方を選べないため、トップページのプラグインセクション（/#plugin）へ送る。
   # ここの URL を直接参照するのは index.html の各カードだけ。
-  pluginStoreUrl4x = "https://www.ec-cube.net/products/detail.php?product_id=3557"
+  # 変数名の末尾は「対応系統の下限」に合わせる（4.4 系が出たら pluginStoreUrl44x を足す）。
+  pluginStoreUrl42x = "https://www.ec-cube.net/products/detail.php?product_id=3557"
+  pluginStoreUrl40x = "https://www.ec-cube.net/products/detail.php?product_id=3581"
   pluginStoreUrl2x = "https://www.ec-cube.net/products/detail.php?product_id=3570"
   # 利用規約・プライバシーポリシー。サイト内ページにせず GitHub 上の Markdown を直接見せる。
   # 掲載口を一つに絞って管理コストを下げ、改定時に利用者が差分（コミット履歴）を追えるようにするため。
