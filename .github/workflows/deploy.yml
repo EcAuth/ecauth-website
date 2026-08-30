@@ -75,7 +75,7 @@ jobs:
         with:
           export-env: true
         env:
-          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN_PROD }}
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
           CLOUDFLARE_API_TOKEN: op://EcAuth/cloudflare-credentials/CLOUDFLARE_API_TOKEN
           CLOUDFLARE_ACCOUNT_ID: op://EcAuth/cloudflare-credentials/CLOUDFLARE_ACCOUNT_ID
 
