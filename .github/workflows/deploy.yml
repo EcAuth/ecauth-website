@@ -21,13 +21,13 @@ jobs:
 
       # playwright.config.ts の webServer が hugo server を起動するため、テスト側でも Hugo が要る。
       - name: Setup Hugo
-        uses: peaceiris/actions-hugo@75d2e84710de30f6ff7268e08f310b60ef14033f # v3.0.0
+        uses: peaceiris/actions-hugo@2752ce1d29631191ea3f27c23495fa06139a5b78 # v3.2.1
         with:
           hugo-version: 'latest'
           extended: true
 
       - name: Install pnpm
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           package_json_file: e2e/package.json
 
@@ -71,7 +71,7 @@ jobs:
 
       - name: Load secrets from 1Password
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: 1password/load-secrets-action@e544b780808654ba8ceba5fb2fe2897103d92ff4 # v5.0.0
+        uses: 1password/load-secrets-action@70062d7a876d3eb6334754fa26efd2fbd90c32f2 # v5.0.1
         with:
           export-env: true
         env:
