@@ -23,8 +23,8 @@ import {
  * マイページ（/mypage/）。OAuth2(PKCE) public client として accounts の認証へ誘導し、
  * 認証済なら GET {apiBaseUrl}/v1/account/organizations の結果を表示する。
  *
- * 画面の単位は Client ではなく**サイト（Organization）**。1 カード = 1 サイトで、
- * カード内にそのサイトの Client がぶら下がる。検証対象は static/js/mypage.js。
+ * 画面の単位は**サイト（Organization）**。1 カード = 1 サイトで、カード内にそのサイトの
+ * Client（EC-CUBE / WordPress など、1 件以上）がぶら下がる。検証対象は static/js/mypage.js。
  *
  * とくに以下は設計上の要なのでテストで固定する:
  *   - client_secret は一覧 API では返らず（has_secret のみ）、ユーザーが「表示」/「コピー」を
@@ -35,6 +35,8 @@ import {
  */
 const ORGANIZATIONS_PATH = '/v1/account/organizations';
 const deletePath = (orgId: number) => `/v1/account/organizations/${orgId}/delete`;
+/** 既存サイトへの Client 追加（EcAuthDocs#121 項目 3）。 */
+const clientsPath = (orgId: number) => `/v1/account/organizations/${orgId}/clients`;
 const revealPath = (id: number) => `/v1/account/clients/${id}/secret/reveal`;
 const regeneratePath = (id: number) => `/v1/account/clients/${id}/secret`;
 const redirectUrisPath = (id: number) => `/v1/account/clients/${id}/redirect-uris`;
@@ -117,12 +119,17 @@ const SANDBOX_ORG = organization({
   clients: [client({ id: SANDBOX_ID, client_id: 'sandbox-client-id', app_name: 'テストサイト' })],
 });
 
-/** GET /v1/account/organizations のレスポンス。production_site_count は本番だけを数える。 */
+/**
+ * GET /v1/account/organizations のレスポンス。production_site_count は本番サイト配下の Client 数
+ * （EcAuthDocs#121 項目 3。mypage.js は自前で数えるが、実サーバと同じ値を入れておく）。
+ */
 function listBody(organizations: MockOrganization[], maxSites = 10) {
   return {
     organizations,
     max_sites: maxSites,
-    production_site_count: organizations.filter((o) => !o.is_sandbox).length,
+    production_site_count: organizations
+      .filter((o) => !o.is_sandbox)
+      .reduce((sum, o) => sum + o.clients.length, 0),
   };
 }
 
@@ -952,6 +959,317 @@ test.describe('認証済', () => {
    * つまり削除は必須の導線だが、client_id もパスキーも失われ、同じドメインで登録し直すことも
    * できない。window.confirm では収まらないので、消えるサイトを列挙した確認ブロックを挟む。
    */
+  /*
+   * 既存サイトへの Client 追加（EcAuthDocs#121 項目 3）。
+   * POST /v1/account/organizations/{id}/clients。サイト（Organization）を増やさず、
+   * 同じ接続先に Client だけを足す。本番サイトへの追加はサイト追加の本番と同じ枠を使う。
+   */
+  test.describe('Client 追加', () => {
+    /** カード内の Client 追加フォーム。 */
+    function clientAddOf(item: Locator): Locator {
+      return item.locator('.client-add');
+    }
+    function clientAddButtonOf(item: Locator): Locator {
+      return item.getByRole('button', { name: /Client を追加/ });
+    }
+
+    test('フォームを開くまで追加 API を呼ばず、開いたら URL 欄にフォーカスする', async ({ page }) => {
+      stubDefaultList();
+      mock.on(clientsPath(PROD_ORG_ID), { status: 599, body: { error: 'unexpected_post' } });
+
+      await page.goto('/mypage/');
+      const prod = itemOf(page, PROD_ORG_ID);
+
+      await expect(clientAddOf(prod)).toBeHidden();
+      await clientAddButtonOf(prod).click();
+
+      await expect(clientAddOf(prod)).toBeVisible();
+      await expect(clientAddOf(prod).locator('.ca-title')).toContainText('「shop-example-com」に Client を追加します');
+      await expect(clientAddOf(prod).locator('.ca-url')).toBeFocused();
+      expect(mock.countTo(clientsPath(PROD_ORG_ID))).toBe(0);
+    });
+
+    test('本番サイトに Client を追加し、一覧を取り直して枠の表示も更新する', async ({ page }) => {
+      const addedClient = client({
+        id: 15,
+        client_id: 'prod-wp-client-id',
+        app_name: 'WordPress',
+        redirect_uris: ['https://blog.example.com/ecauth/callback'],
+        allowed_rp_ids: ['blog.example.com'],
+      });
+      let current = listBody([PROD_ORG, SANDBOX_ORG]);
+      stubOrganizations(() => ({ status: 200, body: current }));
+      mock.on(clientsPath(PROD_ORG_ID), () => {
+        current = listBody([
+          organization({ ...PROD_ORG, clients: [...PROD_ORG.clients, addedClient] }),
+          SANDBOX_ORG,
+        ]);
+        return {
+          status: 201,
+          body: {
+            organization_id: PROD_ORG_ID,
+            id: 15,
+            client_id: 'prod-wp-client-id',
+            has_secret: true,
+            app_name: 'WordPress',
+            redirect_uris: ['https://blog.example.com/ecauth/callback'],
+            allowed_rp_ids: ['blog.example.com'],
+          },
+        };
+      });
+
+      await page.goto('/mypage/');
+      await expect(page.locator('#site-usage')).toHaveText('1 / 10 件');
+      const prod = itemOf(page, PROD_ORG_ID);
+      await clientAddButtonOf(prod).click();
+
+      const form = clientAddOf(prod);
+      await form.locator('.ca-url').fill('https://blog.example.com/');
+      await form.locator('input[type="radio"][value="other"]').check();
+      await form.locator('.ca-name').fill('WordPress');
+      await form.getByRole('button', { name: '追加する' }).click();
+
+      // 追加先 Organization の Id をパスに、URL・プラットフォーム・表示名をボディに送る。
+      const calls = mock.callsTo(clientsPath(PROD_ORG_ID));
+      expect(calls).toHaveLength(1);
+      expect(calls[0].method).toBe('POST');
+      expect(authorizationOf(calls[0])).toBe(`Bearer ${ACCESS_TOKEN}`);
+      expect(calls[0].json).toEqual({
+        site_url: 'https://blog.example.com/',
+        ec_cube_version: 'other',
+        app_name: 'WordPress',
+      });
+
+      // 一覧を取り直し、同じカードに 2 つ目の Client が見出し付きで並ぶ。サイト数は増えない。
+      await expect(page.locator('#list-status')).toHaveClass(/ok/);
+      await expect(page.locator('#list-status')).toContainText('「shop-example-com」に Client を追加しました');
+      expect(listCalls()).toHaveLength(2);
+      await expect(page.locator('.client-item')).toHaveCount(2);
+      await expect(itemOf(page, PROD_ORG_ID).locator('.ci-client')).toHaveCount(2);
+      await expect(itemOf(page, PROD_ORG_ID).locator('.ci-client-name')).toHaveText(['本番サイト', 'WordPress']);
+      await expect(idRowOf(itemOf(page, PROD_ORG_ID).locator('.ci-client').nth(1))).toContainText('prod-wp-client-id');
+      // 本番サイト配下の Client 数が枠を使う（サーバの production_site_count と同じ単位）。
+      await expect(page.locator('#site-usage')).toHaveText('2 / 10 件');
+    });
+
+    test('表示名が空なら app_name を送らず、プラットフォームの既定は 4 系', async ({ page }) => {
+      stubDefaultList();
+      mock.on(clientsPath(SANDBOX_ORG_ID), { status: 201, body: { organization_id: SANDBOX_ORG_ID, id: 16, client_id: 'x' } });
+
+      await page.goto('/mypage/');
+      const sandbox = itemOf(page, SANDBOX_ORG_ID);
+      await clientAddButtonOf(sandbox).click();
+      await clientAddOf(sandbox).locator('.ca-url').fill('https://stg-blog.example.com/');
+      await clientAddOf(sandbox).getByRole('button', { name: '追加する' }).click();
+
+      await expect(page.locator('#list-status')).toHaveClass(/ok/);
+      expect(mock.callsTo(clientsPath(SANDBOX_ORG_ID))[0].json).toEqual({
+        site_url: 'https://stg-blog.example.com/',
+        ec_cube_version: '4',
+      });
+    });
+
+    test('https でない URL は送らずに欄を赤くする', async ({ page }) => {
+      stubDefaultList();
+
+      await page.goto('/mypage/');
+      const prod = itemOf(page, PROD_ORG_ID);
+      await clientAddButtonOf(prod).click();
+      const form = clientAddOf(prod);
+      await form.locator('.ca-url').fill('http://blog.example.com/');
+      await form.getByRole('button', { name: '追加する' }).click();
+
+      await expect(form.locator('.field').first()).toHaveClass(/invalid/);
+      expect(mock.countTo(clientsPath(PROD_ORG_ID))).toBe(0);
+
+      // 直すと赤は消える。
+      await form.locator('.ca-url').fill('https://blog.example.com/');
+      await expect(form.locator('.field').first()).not.toHaveClass(/invalid/);
+    });
+
+    test('サーバが理由を返さない失敗は Client 追加向けの汎用メッセージにする', async ({ page }) => {
+      // サイト追加（新しい Organization）の既定文言「サイトを追加できませんでした」を流用すると、
+      // Client 追加の失敗がサイト作成の失敗に見える。処理種別に合った文言を出す。
+      stubDefaultList();
+      mock.on(clientsPath(PROD_ORG_ID), { status: 500, body: { error: 'server_error' } });
+
+      await page.goto('/mypage/');
+      const prod = itemOf(page, PROD_ORG_ID);
+      await clientAddButtonOf(prod).click();
+      const form = clientAddOf(prod);
+      await form.locator('.ca-url').fill('https://blog.example.com/');
+      await form.locator('input[type="radio"][value="other"]').check();
+      await form.getByRole('button', { name: '追加する' }).click();
+
+      const status = form.locator('[data-status="client-add"]');
+      await expect(status).toHaveClass(/err/);
+      await expect(status).toContainText('Client を追加できませんでした');
+      await expect(status).not.toContainText('サイトを追加できませんでした');
+      await expect(form.getByRole('button', { name: '追加する' })).toBeEnabled();
+    });
+
+    test('追加後の一覧再取得に失敗したらフォームを閉じ、ボタンを再び押せる状態に戻す', async ({ page }) => {
+      // loadSites は失敗時に既存カードを残すため、後始末をしないと「追加中…」のまま
+      // 閉じられないフォームが残る。Client は作成済みなので入力は初期化して閉じる。
+      let listFails = false;
+      stubOrganizations(() =>
+        listFails ? { status: 500, body: { error: 'server_error' } } : { status: 200, body: DEFAULT_BODY }
+      );
+      mock.on(clientsPath(PROD_ORG_ID), () => {
+        listFails = true;
+        return {
+          status: 201,
+          body: client({
+            id: 15,
+            client_id: 'prod-wp-client-id',
+            app_name: 'WordPress',
+            redirect_uris: ['https://blog.example.com/ecauth/callback'],
+            allowed_rp_ids: ['blog.example.com'],
+          }),
+        };
+      });
+
+      await page.goto('/mypage/');
+      const prod = itemOf(page, PROD_ORG_ID);
+      await clientAddButtonOf(prod).click();
+      const form = clientAddOf(prod);
+      await form.locator('.ca-url').fill('https://blog.example.com/');
+      await form.locator('.ca-name').fill('WordPress');
+      await form.getByRole('button', { name: '追加する' }).click();
+
+      // 一覧側にエラー、フォームは閉じる。完了メッセージは出さない。
+      await expect(page.locator('#list-status')).toHaveClass(/err/);
+      await expect(form).toBeHidden();
+      await expect(page.locator('#list-status')).not.toContainText('Client を追加しました');
+
+      // trigger は再び押せ、開き直したフォームは初期状態（入力空・ボタン有効・ラベル復元）。
+      await expect(clientAddButtonOf(prod)).toBeEnabled();
+      await clientAddButtonOf(prod).click();
+      await expect(form).toBeVisible();
+      await expect(form.locator('.ca-url')).toHaveValue('');
+      await expect(form.locator('.ca-name')).toHaveValue('');
+      await expect(form.getByRole('button', { name: '追加する' })).toBeEnabled();
+      await expect(form.getByRole('button', { name: 'やめる' })).toBeEnabled();
+    });
+
+    test('本番サイトが上限に達していると本番の Client 追加は押せず、テストサイトには追加できる', async ({ page }) => {
+      // max_sites = 1 で本番 Client が 1 件。本番への追加はサーバも 422 で弾くため、押す前に止める。
+      stubOrganizations({ status: 200, body: listBody([PROD_ORG, SANDBOX_ORG], 1) });
+
+      await page.goto('/mypage/');
+      await expect(page.locator('#site-usage')).toHaveText('1 / 1 件');
+
+      const prodButton = clientAddButtonOf(itemOf(page, PROD_ORG_ID));
+      await expect(prodButton).toBeDisabled();
+      await expect(prodButton).toHaveAttribute('title', /上限の 1 件に達しています/);
+
+      // テストサイト配下の Client は枠に数えないので追加できる。
+      await expect(clientAddButtonOf(itemOf(page, SANDBOX_ORG_ID))).toBeEnabled();
+    });
+
+    test('他の組織が使うドメインなら 422 の理由を表示し、URL 欄を赤くする', async ({ page }) => {
+      stubDefaultList();
+      mock.on(clientsPath(PROD_ORG_ID), {
+        status: 422,
+        body: {
+          error: 'organization_already_exists',
+          error_description: 'このドメインは既に EcAuth に登録されています。別のサイト URL でお申し込みください。',
+          field: 'site_url',
+        },
+      });
+
+      await page.goto('/mypage/');
+      const prod = itemOf(page, PROD_ORG_ID);
+      await clientAddButtonOf(prod).click();
+      const form = clientAddOf(prod);
+      await form.locator('.ca-url').fill('https://taken.example.com/');
+      await form.getByRole('button', { name: '追加する' }).click();
+
+      const status = form.locator('[data-status="client-add"]');
+      await expect(status).toHaveClass(/err/);
+      // 申込向けの文言はマイページの文脈に合わないので差し替える（サイト追加と同じ）。
+      await expect(status).toContainText('既に別のサイトとして登録されています');
+      await expect(form.locator('.field').first()).toHaveClass(/invalid/);
+      // 一覧は取り直さない（失敗時に入力を残すため）。
+      expect(listCalls()).toHaveLength(1);
+      await expect(form.locator('.ca-url')).toHaveValue('https://taken.example.com/');
+      await expect(form.getByRole('button', { name: '追加する' })).toBeEnabled();
+    });
+
+    test('上限超過などサーバの 422 はその文言をそのまま出す', async ({ page }) => {
+      stubDefaultList();
+      mock.on(clientsPath(PROD_ORG_ID), {
+        status: 422,
+        body: {
+          error: 'site_limit_exceeded',
+          error_description: '登録できる本番サイトは 10 件までです。不要なサイトを削除するか、サポートにお問い合わせください。',
+          field: 'site_url',
+        },
+      });
+
+      await page.goto('/mypage/');
+      const prod = itemOf(page, PROD_ORG_ID);
+      await clientAddButtonOf(prod).click();
+      await clientAddOf(prod).locator('.ca-url').fill('https://blog.example.com/');
+      await clientAddOf(prod).getByRole('button', { name: '追加する' }).click();
+
+      await expect(clientAddOf(prod).locator('[data-status="client-add"]')).toContainText('登録できる本番サイトは 10 件までです');
+    });
+
+    test('「やめる」でフォームを閉じ、入力エラーの表示も消す', async ({ page }) => {
+      stubDefaultList();
+
+      await page.goto('/mypage/');
+      const prod = itemOf(page, PROD_ORG_ID);
+      await clientAddButtonOf(prod).click();
+      const form = clientAddOf(prod);
+      await form.locator('.ca-url').fill('not a url');
+      await form.getByRole('button', { name: '追加する' }).click();
+      await expect(form.locator('.field').first()).toHaveClass(/invalid/);
+
+      await form.getByRole('button', { name: 'やめる' }).click();
+      await expect(form).toBeHidden();
+      await expect(clientAddButtonOf(prod)).toHaveAttribute('aria-expanded', 'false');
+
+      await clientAddButtonOf(prod).click();
+      await expect(form.locator('.field').first()).not.toHaveClass(/invalid/);
+    });
+
+    test('別のカードのフォームや削除確認を開くと前のフォームは閉じる', async ({ page }) => {
+      stubDefaultList();
+
+      await page.goto('/mypage/');
+      const prod = itemOf(page, PROD_ORG_ID);
+      const sandbox = itemOf(page, SANDBOX_ORG_ID);
+
+      await clientAddButtonOf(prod).click();
+      await expect(clientAddOf(prod)).toBeVisible();
+
+      await clientAddButtonOf(sandbox).click();
+      await expect(clientAddOf(sandbox)).toBeVisible();
+      await expect(clientAddOf(prod)).toBeHidden();
+
+      // 削除確認を開いても閉じる（どのサイトへの操作か読み取りにくくなるため）。
+      await prod.getByRole('button', { name: /削除/ }).click();
+      await expect(confirmOf(prod)).toBeVisible();
+      await expect(clientAddOf(sandbox)).toBeHidden();
+    });
+
+    test('追加中に 401 になったらログイン画面に戻す', async ({ page }) => {
+      stubDefaultList();
+      mock.on(clientsPath(PROD_ORG_ID), { status: 401, body: { error: 'invalid_token' } });
+
+      await page.goto('/mypage/');
+      const prod = itemOf(page, PROD_ORG_ID);
+      await clientAddButtonOf(prod).click();
+      await clientAddOf(prod).locator('.ca-url').fill('https://blog.example.com/');
+      await clientAddOf(prod).getByRole('button', { name: '追加する' }).click();
+
+      await expect(page.locator('#login-view')).toBeVisible();
+      expect(await readSession(page, AT_KEY)).toBeNull();
+    });
+  });
+
   test.describe('サイト削除', () => {
     test('確認ブロックを開くまで削除 API を呼ばない', async ({ page }) => {
       stubDefaultList();
