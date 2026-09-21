@@ -1087,6 +1087,27 @@ test.describe('認証済', () => {
       await expect(form.locator('.field').first()).not.toHaveClass(/invalid/);
     });
 
+    test('サーバが理由を返さない失敗は Client 追加向けの汎用メッセージにする', async ({ page }) => {
+      // サイト追加（新しい Organization）の既定文言「サイトを追加できませんでした」を流用すると、
+      // Client 追加の失敗がサイト作成の失敗に見える。処理種別に合った文言を出す。
+      stubDefaultList();
+      mock.on(clientsPath(PROD_ORG_ID), { status: 500, body: { error: 'server_error' } });
+
+      await page.goto('/mypage/');
+      const prod = itemOf(page, PROD_ORG_ID);
+      await clientAddButtonOf(prod).click();
+      const form = clientAddOf(prod);
+      await form.locator('.ca-url').fill('https://blog.example.com/');
+      await form.locator('input[type="radio"][value="other"]').check();
+      await form.getByRole('button', { name: '追加する' }).click();
+
+      const status = form.locator('[data-status="client-add"]');
+      await expect(status).toHaveClass(/err/);
+      await expect(status).toContainText('Client を追加できませんでした');
+      await expect(status).not.toContainText('サイトを追加できませんでした');
+      await expect(form.getByRole('button', { name: '追加する' })).toBeEnabled();
+    });
+
     test('本番サイトが上限に達していると本番の Client 追加は押せず、テストサイトには追加できる', async ({ page }) => {
       // max_sites = 1 で本番 Client が 1 件。本番への追加はサーバも 422 で弾くため、押す前に止める。
       stubOrganizations({ status: 200, body: listBody([PROD_ORG, SANDBOX_ORG], 1) });

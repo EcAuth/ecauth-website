@@ -655,7 +655,8 @@
         cancel.disabled = false;
         trigger.disabled = false;
         submit.textContent = original;
-        App.setStatus(statusEl, 'err', addErrorMessage(res));
+        App.setStatus(statusEl, 'err',
+          addErrorMessage(res, 'Client を追加できませんでした。入力内容をご確認ください。'));
         if (res.data && res.data.field === 'site_url') urlField.classList.add('invalid');
         return;
       }
@@ -918,19 +919,22 @@
    * 追加エラーの文言。error_description は申込フォームと共用のため、マイページの文脈に
    * 合わないものだけ差し替える。
    */
-  function addErrorMessage(res) {
+  // fallback: error_description の無い応答に出す既定文言。サイト追加（新しい Organization）と
+  // Client 追加（既存 Organization への追加）で処理種別が違うため、呼び出し側が渡す。
+  function addErrorMessage(res, fallback) {
     var data = res.data || {};
     if (res.networkError) {
       return 'ネットワークエラーが発生しました。時間をおいて再度お試しください。';
     }
-    // 導出後の組織コードが既存サイトと同じになるケース（`www.` の有無だけが違う URL など）も
-    // ここに来る。申込向けの「別のサイト URL でお申し込みください」では原因が読み取れない。
+    // ホストの占有は Client の allowed_rp_ids 単位で判定され、`www.` の有無だけが違う URL も
+    // 同じホストとして扱われるため、ここに来る。申込向けの「別のサイト URL でお申し込みください」
+    // では原因が読み取れない。
     // 409（並行追加の競合）は「時間をおいて再度」が正しいので差し替えない。
     if (res.status === 422 && data.error === 'organization_already_exists') {
       return 'このドメインは既に別のサイトとして登録されています。'
         + '「www.」の有無だけが違う URL も同じサイトとして扱われます。登録済みのサイトをご確認ください。';
     }
-    return descriptionOf(res) || 'サイトを追加できませんでした。入力内容をご確認ください。';
+    return descriptionOf(res) || fallback || 'サイトを追加できませんでした。入力内容をご確認ください。';
   }
 
   [kindProduction, kindSandbox].forEach(function (radio) {
