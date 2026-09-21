@@ -16,7 +16,7 @@
   <div id="app-view" style="display:none">
     <div class="app-card">
       <h1 class="app-title">サイト一覧</h1>
-      <p class="app-lead">サイトごとに、EC-CUBE プラグインに設定する <strong>Client ID</strong> / <strong>Client Secret</strong> を発行しています。<strong>本番サイト</strong>と<strong>テストサイト</strong>で別々に設定してください。各サイトの<strong>コールバック URL</strong>と<strong>パスキーのドメイン</strong>も、それぞれの欄を開いて変更できます。</p>
+      <p class="app-lead">サイトごとに、EC-CUBE プラグインに設定する <strong>Client ID</strong> / <strong>Client Secret</strong> を発行しています。<strong>本番サイト</strong>と<strong>テストサイト</strong>で別々に設定してください。各サイトの<strong>コールバック URL</strong>と<strong>パスキーのドメイン</strong>も、それぞれの欄を開いて変更できます。同じサイトで EC-CUBE と WordPress のように複数のアプリケーションを使う場合は、カードの「Client を追加」から Client を増やせます。</p>
       <div id="sites"></div>
       <div class="status" id="list-status" role="status" aria-live="polite"></div>
     </div>
@@ -24,7 +24,7 @@
     <!-- サイト追加 -->
     <div class="app-card" id="add-card">
       <h2 class="app-title sub">サイトを追加</h2>
-      <p class="app-lead">登録済みの本番サイト <strong id="site-usage">–</strong>。テストサイトは本番サイト 1 件につき 1 件まで登録でき、この件数には数えません。</p>
+      <p class="app-lead">登録済みの本番サイトの Client <strong id="site-usage">–</strong>。本番サイトに追加した Client もこの件数に数えます。テストサイトは本番サイト 1 件につき 1 件まで登録でき、テストサイトとその Client はこの件数には数えません。</p>
 
       <form id="add-form" novalidate>
         <div class="field" id="f-add-kind">

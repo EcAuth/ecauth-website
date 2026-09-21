@@ -2,8 +2,11 @@
  * マイページ: OAuth2(PKCE) public client。
  * 未認証 → パスキー認証(accounts)へ誘導。認証済 → GET /v1/account/organizations を表示。
  *
- * 画面の単位は Client ではなく **サイト（Organization）**。1 サイト = 1 Organization で、
- * Client はその配下にぶら下がる（申込もマイページからの追加も Client を 1 つ作る）。
+ * 画面の単位は **サイト（Organization）**。Organization = 組織、Client = アプリケーション
+ * （EC-CUBE / WordPress 等）で、1 つのサイトに複数の Client がぶら下がる（EcAuthDocs#121）。
+ * 申込もマイページからのサイト追加も Client を 1 つ持つ Organization を作り、既存のサイトには
+ * カード内の「Client を追加」から POST /v1/account/organizations/{id}/clients で Client を足す。
+ * 本番の登録上限（max_sites）は本番サイト配下の Client 数で数える（サーバと同じ単位）。
  * organizations は各 Organization の clients[] を内包するため一覧はこの 1 本で足り、
  * 加えて「本番 / テストの対応」（parent_organization_id）と「本番の登録上限」（max_sites）を
  * 返す。サイト追加フォームはこの 2 つが無いと選択肢も残枠も出せないので、
@@ -508,6 +511,166 @@
     return { box: box, close: close };
   }
 
+  /*
+   * 既存サイトへの Client 追加（EcAuthDocs#121 項目 3）。
+   *
+   * 同じ組織で EC-CUBE と WordPress のように複数のアプリケーションを運用する場合、サイト
+   * （Organization）を増やすと接続先サブドメイン・Client ID / Secret・カードがサイト数だけ
+   * 増える。代わりに既存サイトのカード内に Client を足し、テナント（接続先）は共有する。
+   *
+   * 本番サイトへの追加はサイト追加の本番と同じ枠（max_sites = 本番配下の Client 数）を使う。
+   * テストサイトへの追加は枠に数えない。上限到達はサーバも 422 で弾くが、押す前に理由を出す。
+   */
+  function makeClientAddForm(org, trigger) {
+    var box = el('form', 'client-add');
+    box.hidden = true;
+    box.setAttribute('novalidate', '');
+
+    box.appendChild(el('p', 'ca-title', '「' + siteLabel(org) + '」に Client を追加します。'));
+    box.appendChild(el('p', 'ca-note',
+      '同じサイトで EC-CUBE と WordPress のように複数のアプリケーションを使う場合に追加します。'
+        + '接続先（' + siteLabel(org) + '）は共有し、Client ID / Client Secret を新たに発行します。'));
+
+    var urlField = el('div', 'field');
+    var urlId = 'ca-url-' + org.id;
+    var urlLabel = el('label', null, 'アプリケーションの URL');
+    urlLabel.setAttribute('for', urlId);
+    urlLabel.appendChild(el('span', 'req', '*'));
+    urlField.appendChild(urlLabel);
+    var urlInput = el('input', 'ca-url');
+    urlInput.type = 'url';
+    urlInput.id = urlId;
+    urlInput.placeholder = 'https://blog.example.jp';
+    urlInput.setAttribute('inputmode', 'url');
+    urlInput.setAttribute('autocomplete', 'off');
+    urlField.appendChild(urlInput);
+    urlField.appendChild(el('div', 'hint',
+      'https:// で始まる URL を入力してください。コールバック URL とパスキーのドメインの初期値はこの URL から作られます。'
+        + '既存の Client と同じドメインでも追加できます。'));
+    var urlErr = el('div', 'err-msg', 'https:// で始まる有効な URL を入力してください。');
+    urlErr.setAttribute('role', 'alert');
+    urlField.appendChild(urlErr);
+    box.appendChild(urlField);
+
+    var versionField = el('div', 'field');
+    var versionLabelId = 'ca-version-label-' + org.id;
+    var versionLabel = el('label', null, 'ご利用の EC プラットフォーム');
+    versionLabel.id = versionLabelId;
+    versionLabel.appendChild(el('span', 'req', '*'));
+    versionField.appendChild(versionLabel);
+    var radios = el('div', 'radio-row');
+    radios.setAttribute('role', 'radiogroup');
+    radios.setAttribute('aria-labelledby', versionLabelId);
+    var versionName = 'ca_version_' + org.id;
+    [['4', 'EC-CUBE 4 系'], ['2', 'EC-CUBE 2 系'], ['other', 'EC-CUBE 以外']].forEach(function (v, i) {
+      var label = el('label');
+      var radio = el('input');
+      radio.type = 'radio';
+      radio.name = versionName;
+      radio.value = v[0];
+      if (i === 0) radio.checked = true;
+      label.appendChild(radio);
+      label.appendChild(el('span', null, v[1]));
+      radios.appendChild(label);
+    });
+    versionField.appendChild(radios);
+    versionField.appendChild(el('div', 'hint', 'コールバック URL の初期値がバージョンによって変わります。追加後に変更できます。'));
+    box.appendChild(versionField);
+
+    var nameField = el('div', 'field');
+    var nameId = 'ca-name-' + org.id;
+    var nameLabel = el('label', null, '表示名');
+    nameLabel.setAttribute('for', nameId);
+    nameLabel.appendChild(el('span', 'opt', '（任意）'));
+    nameField.appendChild(nameLabel);
+    var nameInput = el('input', 'ca-name');
+    nameInput.type = 'text';
+    nameInput.id = nameId;
+    nameInput.placeholder = 'WordPress';
+    nameInput.maxLength = 100;
+    nameInput.setAttribute('autocomplete', 'off');
+    nameField.appendChild(nameInput);
+    nameField.appendChild(el('div', 'hint', '同じサイトの Client を見分けるための名前です。未入力ならアプリケーションのホスト名になります。'));
+    box.appendChild(nameField);
+
+    var actions = el('div', 'ca-actions');
+    var submit = el('button', 'btn primary small ca-ok', '追加する');
+    submit.type = 'submit';
+    var cancel = el('button', 'btn secondary small ca-cancel', 'やめる');
+    cancel.type = 'button';
+    actions.appendChild(submit);
+    actions.appendChild(cancel);
+    box.appendChild(actions);
+
+    // App.setStatus は className を差し替えるため、目印はクラスではなく属性で持つ
+    // （makeSettingsSection / makeDeleteConfirm と同じ理由）。
+    var statusEl = el('div', 'status');
+    statusEl.setAttribute('data-status', 'client-add');
+    statusEl.setAttribute('role', 'status');
+    statusEl.setAttribute('aria-live', 'polite');
+    box.appendChild(statusEl);
+
+    function close() {
+      box.hidden = true;
+      trigger.setAttribute('aria-expanded', 'false');
+      urlField.classList.remove('invalid');
+      App.clearStatus(statusEl);
+    }
+
+    cancel.addEventListener('click', function () { close(); });
+
+    urlInput.addEventListener('input', function () {
+      var v = this.value.trim();
+      if (v !== '' && validSiteUrl(v)) urlField.classList.remove('invalid');
+    });
+
+    box.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      App.clearStatus(statusEl);
+      App.clearStatus(listStatus);
+
+      var url = urlInput.value.trim();
+      var urlOk = url !== '' && validSiteUrl(url);
+      urlField.classList.toggle('invalid', !urlOk);
+      if (!urlOk) return;
+
+      var checked = box.querySelector('input[name="' + versionName + '"]:checked');
+      var body = { site_url: url, ec_cube_version: checked ? checked.value : '4' };
+      var appName = nameInput.value.trim();
+      if (appName !== '') body.app_name = appName;
+
+      submit.disabled = true;
+      cancel.disabled = true;
+      trigger.disabled = true;
+      var original = submit.textContent;
+      submit.textContent = '追加中…';
+
+      var res = await authFetch(
+        'POST', '/v1/account/organizations/' + encodeURIComponent(org.id) + '/clients', body);
+
+      if (res.status === 401) { requireLogin(); return; }
+
+      if (!res.ok) {
+        submit.disabled = false;
+        cancel.disabled = false;
+        trigger.disabled = false;
+        submit.textContent = original;
+        App.setStatus(statusEl, 'err', addErrorMessage(res));
+        if (res.data && res.data.field === 'site_url') urlField.classList.add('invalid');
+        return;
+      }
+
+      // 再読込でこのカードごと描き直す。完了メッセージは一覧側に出す。
+      // 再取得に失敗したときは書かない（makeDeleteConfirm と同じ理由）。
+      if (!(await loadSites())) return;
+      App.setStatus(listStatus, 'ok',
+        '「' + siteLabel(org) + '」に Client を追加しました。'
+          + '新しい Client ID / Client Secret を確認し、アプリケーションに設定してください。');
+    });
+
+    return { box: box, close: close };
+  }
+
   function makeSiteCard(org, parent) {
     // ルートのクラス名は .client-item のまま。EcAuth 側の結合 E2E
     // （website_signup_flow.spec.ts）がこのセレクタでカードを掴んでおり、
@@ -520,15 +683,30 @@
     name.appendChild(el('span', 'obadge ' + (org.is_sandbox ? 'sand' : 'prod'), org.is_sandbox ? 'テスト' : '本番'));
     // 見出しは組織コード。組織名（申込時の会社名）はアカウント内の全サイトで同じ値になるため
     // サイトの識別に使えない。組織コードは接続先ホスト（https://{組織コード}.ec-auth.io）
-    // そのものであり、サイトのドメインから導出されるので実質の識別子になる。
+    // そのものであり、最初のアプリケーションのドメインから導出されるので実質の識別子になる。
     name.appendChild(el('span', 'ci-code', siteLabel(org)));
     head.appendChild(name);
+
+    var headActions = el('div', 'ci-actions');
+
+    var addClientBtn = el('button', 'icon-btn client-add-btn', '+ Client を追加');
+    addClientBtn.type = 'button';
+    addClientBtn.setAttribute('aria-expanded', 'false');
+    addClientBtn.setAttribute('aria-label', siteLabel(org) + ' に Client を追加');
+    // 本番サイトの Client は上限（max_sites）の枠を使う。押しても 422 になる状態では無効化し、
+    // 理由はサイト追加フォーム側のヒント（syncAddForm）と同じ文言で示す。
+    if (!org.is_sandbox && !canAddProductionClient()) {
+      addClientBtn.disabled = true;
+      addClientBtn.title = '本番サイトは上限の ' + maxSites + ' 件に達しています。';
+    }
+    headActions.appendChild(addClientBtn);
 
     var del = el('button', 'icon-btn site-del', '削除');
     del.type = 'button';
     del.setAttribute('aria-expanded', 'false');
     del.setAttribute('aria-label', siteLabel(org) + ' を削除');
-    head.appendChild(del);
+    headActions.appendChild(del);
+    head.appendChild(headActions);
     item.appendChild(head);
 
     if (org.name) item.appendChild(el('div', 'ci-owner', org.name));
@@ -540,7 +718,8 @@
     var clients = org.clients || [];
     clients.forEach(function (client) {
       var block = el('div', 'ci-client');
-      // 通常は 1 サイト 1 Client。複数ある場合だけ、どの Client の設定かを見出しで示す。
+      block.setAttribute('data-client-id', String(client.id));
+      // Client が 1 件だけなら見出しは要らない。複数ある場合だけ、どの Client の設定かを見出しで示す。
       if (clients.length > 1) block.appendChild(el('div', 'ci-client-name', client.app_name || client.client_id));
       block.appendChild(makeCodeRow('Client ID', client.client_id));
       block.appendChild(makeSecretRow(client));
@@ -548,9 +727,22 @@
       item.appendChild(block);
     });
 
+    var clientAdd = makeClientAddForm(org, addClientBtn);
+    item.appendChild(clientAdd.box);
+    closers.push(clientAdd.close);
+
     var deleteConfirm = makeDeleteConfirm(org, del);
     item.appendChild(deleteConfirm.box);
     closers.push(deleteConfirm.close);
+
+    addClientBtn.addEventListener('click', function () {
+      if (!clientAdd.box.hidden) { clientAdd.close(); return; }
+      // 他のカードの追加フォーム・削除確認は閉じる（どのサイトへの操作か読み取りにくくなるため）。
+      closeAllConfirms();
+      clientAdd.box.hidden = false;
+      addClientBtn.setAttribute('aria-expanded', 'true');
+      clientAdd.box.querySelector('.ca-url').focus();
+    });
 
     del.addEventListener('click', function () {
       if (!deleteConfirm.box.hidden) { deleteConfirm.close(); return; }
@@ -623,9 +815,19 @@
 
   // --- サイト追加 ---
 
-  /** 本番サイトの登録数。上限（max_sites）はこの数だけを数え、テストサイトは含めない。 */
+  /**
+   * 本番サイト配下の Client 数。上限（max_sites）はこの数を数え、テストサイト配下の Client は
+   * 含めない（サーバの production_site_count と同じ単位。EcAuthDocs#121 項目 3）。
+   */
   function productionCount() {
-    return organizations.filter(function (o) { return !o.is_sandbox; }).length;
+    return organizations.reduce(function (sum, o) {
+      return o.is_sandbox ? sum : sum + (o.clients || []).length;
+    }, 0);
+  }
+
+  /** 本番サイトに Client をこれ以上足せるか（サイト追加の本番と同じ枠を使う）。 */
+  function canAddProductionClient() {
+    return productionCount() < maxSites;
   }
 
   /** テストサイトをまだ持たない本番サイト。テストサイトの追加先候補になる。 */

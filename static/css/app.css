@@ -139,7 +139,7 @@
 .mt-2 { margin-top: 1.25rem; }
 
 /* --- マイページ: サイト（Organization）一覧 --- */
-/* 1 カード = 1 サイト。カード内に、そのサイトの Client（通常 1 件）がぶら下がる。 */
+/* 1 カード = 1 サイト。カード内に、そのサイトの Client（EC-CUBE / WordPress など、1 件以上）がぶら下がる。 */
 .org-select-row { display: flex; align-items: center; gap: .75rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
 .org-select-row label { font-weight: 600; white-space: nowrap; }
 .org-select-row select { flex: 1; min-width: 200px; }
@@ -159,7 +159,7 @@
 .client-item.child { margin-left: 1.5rem; border-left: 3px solid rgba(217, 119, 6, .35); }
 .client-item .ci-parent { color: var(--color-text-light); font-size: .85rem; margin: -.5rem 0 .75rem; }
 
-/* 1 サイトに Client が複数ある場合の区切り。通常は 1 件で、見出しも出ない。 */
+/* 1 サイトに Client が複数ある場合の区切り。1 件だけなら見出しは出ない。 */
 .ci-client + .ci-client { border-top: 1px dashed var(--color-border); margin-top: .9rem; padding-top: .7rem; }
 .ci-client-name { font-weight: 600; font-size: .92rem; margin-bottom: .4rem; }
 
@@ -228,3 +228,15 @@
 /* --- マイページ: サイト追加 --- */
 .app-title.sub { font-size: 1.2rem; }
 #site-usage { white-space: nowrap; }
+
+/* --- マイページ: 既存サイトへの Client 追加 --- */
+/* 本番 / テストのサイトを増やさず、同じサイト（接続先）に Client だけを足す導線。
+   削除確認と同じくカード内に展開するが、破壊的操作ではないので配色は通常の枠。 */
+.ci-actions { display: flex; gap: .5rem; flex: none; flex-wrap: wrap; justify-content: flex-end; }
+.client-add { border: 1px solid var(--color-border); background: var(--color-bg-light); border-radius: 8px; padding: .9rem 1rem; margin-top: .9rem; }
+.client-add[hidden] { display: none; }
+.client-add .field { margin-bottom: .9rem; }
+.ca-title { font-weight: 700; font-size: .95rem; margin: 0 0 .4rem; }
+.ca-note { font-size: .85rem; color: var(--color-text-light); line-height: 1.6; margin: 0 0 .8rem; }
+.ca-actions { display: flex; gap: .5rem; margin-top: .2rem; }
+.client-add .status { margin-top: .75rem; }
