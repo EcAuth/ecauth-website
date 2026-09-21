@@ -1108,6 +1108,50 @@ test.describe('認証済', () => {
       await expect(form.getByRole('button', { name: '追加する' })).toBeEnabled();
     });
 
+    test('追加後の一覧再取得に失敗したらフォームを閉じ、ボタンを再び押せる状態に戻す', async ({ page }) => {
+      // loadSites は失敗時に既存カードを残すため、後始末をしないと「追加中…」のまま
+      // 閉じられないフォームが残る。Client は作成済みなので入力は初期化して閉じる。
+      let listFails = false;
+      stubOrganizations(() =>
+        listFails ? { status: 500, body: { error: 'server_error' } } : { status: 200, body: DEFAULT_BODY }
+      );
+      mock.on(clientsPath(PROD_ORG_ID), () => {
+        listFails = true;
+        return {
+          status: 201,
+          body: client({
+            id: 15,
+            client_id: 'prod-wp-client-id',
+            app_name: 'WordPress',
+            redirect_uris: ['https://blog.example.com/ecauth/callback'],
+            allowed_rp_ids: ['blog.example.com'],
+          }),
+        };
+      });
+
+      await page.goto('/mypage/');
+      const prod = itemOf(page, PROD_ORG_ID);
+      await clientAddButtonOf(prod).click();
+      const form = clientAddOf(prod);
+      await form.locator('.ca-url').fill('https://blog.example.com/');
+      await form.locator('.ca-name').fill('WordPress');
+      await form.getByRole('button', { name: '追加する' }).click();
+
+      // 一覧側にエラー、フォームは閉じる。完了メッセージは出さない。
+      await expect(page.locator('#list-status')).toHaveClass(/err/);
+      await expect(form).toBeHidden();
+      await expect(page.locator('#list-status')).not.toContainText('Client を追加しました');
+
+      // trigger は再び押せ、開き直したフォームは初期状態（入力空・ボタン有効・ラベル復元）。
+      await expect(clientAddButtonOf(prod)).toBeEnabled();
+      await clientAddButtonOf(prod).click();
+      await expect(form).toBeVisible();
+      await expect(form.locator('.ca-url')).toHaveValue('');
+      await expect(form.locator('.ca-name')).toHaveValue('');
+      await expect(form.getByRole('button', { name: '追加する' })).toBeEnabled();
+      await expect(form.getByRole('button', { name: 'やめる' })).toBeEnabled();
+    });
+
     test('本番サイトが上限に達していると本番の Client 追加は押せず、テストサイトには追加できる', async ({ page }) => {
       // max_sites = 1 で本番 Client が 1 件。本番への追加はサーバも 422 で弾くため、押す前に止める。
       stubOrganizations({ status: 200, body: listBody([PROD_ORG, SANDBOX_ORG], 1) });

@@ -663,7 +663,19 @@
 
       // 再読込でこのカードごと描き直す。完了メッセージは一覧側に出す。
       // 再取得に失敗したときは書かない（makeDeleteConfirm と同じ理由）。
-      if (!(await loadSites())) return;
+      if (!(await loadSites())) {
+        // loadSites は失敗時に既存カードを残すので、このフォームも「追加中…」のまま画面に残る。
+        // Client は作成済みのため、入力を保ったまま submit を戻すと二重作成を招く。
+        // フォームを閉じて入力を初期化し、次に開けるよう trigger とボタンだけ戻す。
+        // 失敗の理由は loadSites が一覧側に出しているのでここでは触らない。
+        close();
+        box.reset();
+        submit.disabled = false;
+        cancel.disabled = false;
+        trigger.disabled = false;
+        submit.textContent = original;
+        return;
+      }
       App.setStatus(listStatus, 'ok',
         '「' + siteLabel(org) + '」に Client を追加しました。'
           + '新しい Client ID / Client Secret を確認し、アプリケーションに設定してください。');
