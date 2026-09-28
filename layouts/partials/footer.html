@@ -9,6 +9,11 @@
       <a href="{{ . }}" target="_blank" rel="noopener">お問い合わせ・ご要望</a>
       {{- end }}
     </nav>
+    <nav class="footer-nav footer-legal" aria-label="規約・法定表記">
+      <a href="{{ .Site.Params.termsUrl }}" target="_blank" rel="noopener">利用規約</a>
+      <a href="{{ .Site.Params.privacyUrl }}" target="_blank" rel="noopener">プライバシーポリシー</a>
+      <a href="/tradelaw/">特定商取引法に基づく表記</a>
+    </nav>
     <p>&copy; {{ now.Year }} EcAuth. All rights reserved.</p>
   </div>
 </footer>
