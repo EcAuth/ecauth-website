@@ -588,6 +588,64 @@ body {
   color: var(--color-primary);
 }
 
+.footer-legal {
+  font-size: 0.8125rem;
+}
+
+/* Legal pages（特定商取引法に基づく表記） */
+.legal {
+  padding-top: 3rem;
+  padding-bottom: 4rem;
+}
+
+.legal h1 {
+  font-size: 1.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.legal table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+}
+
+.legal th,
+.legal td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+/* 表頭（項目 / 内容）は見出しとして不要なので隠し、行頭の項目名を見出し扱いにする */
+.legal thead {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.legal td:first-child {
+  width: 12rem;
+  font-weight: 600;
+  background: var(--color-bg-light);
+}
+
+@media (max-width: 640px) {
+  .legal tr,
+  .legal td {
+    display: block;
+    width: 100%;
+  }
+
+  .legal td:first-child {
+    width: 100%;
+    border-bottom: none;
+    padding-bottom: 0.25rem;
+  }
+}
+
 /* Contact floating button */
 .contact-fab {
   position: fixed;
