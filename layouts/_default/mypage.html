@@ -68,6 +68,15 @@
       <h3>次のステップ</h3>
       <p class="app-lead" style="margin:0">EC-CUBE 管理画面の「EcAuth 設定」に、上記の Client ID / Client Secret を入力してください。設定後、管理者用パスキーの登録に進めます。パスキーの登録・ログインが失敗する場合は、コールバック URL とパスキーのドメインが管理画面の URL と一致しているか確認してください。</p>
     </div>
+
+    <!-- お支払い（EcAuthDocs#119）。課金 API が無効（404）の間は出さない。 -->
+    <div class="app-card" id="billing-card" style="display:none">
+      <h2 class="app-title sub">お支払い</h2>
+      <div class="status" id="billing-notice" role="status" aria-live="polite"></div>
+      <div id="billing-payment"></div>
+      <div id="billing-estimate"></div>
+      <div class="status" id="billing-status" role="status" aria-live="polite"></div>
+    </div>
     <p class="center mt-2"><a class="muted-link" href="#" id="logout-link">ログアウト</a></p>
   </div>
 </div>

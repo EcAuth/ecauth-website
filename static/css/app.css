@@ -240,3 +240,36 @@
 .ca-note { font-size: .85rem; color: var(--color-text-light); line-height: 1.6; margin: 0 0 .8rem; }
 .ca-actions { display: flex; gap: .5rem; margin-top: .2rem; }
 .client-add .status { margin-top: .75rem; }
+
+/* --- お支払い（EcAuthDocs#119） --- */
+#billing-notice { margin: 0 0 1rem; }
+.bill-state { margin: 0 0 .4rem; }
+.bill-state .bill-ok { color: var(--color-accent); }
+.bill-state .bill-none { color: #d97706; }
+.bill-note { font-size: .85rem; color: var(--color-text-light); line-height: 1.6; margin: 0 0 .8rem; }
+.bill-h { font-size: 1rem; margin: 1.5rem 0 .3rem; padding-top: 1.1rem; border-top: 1px solid var(--color-border); }
+.bill-exempt-all { margin: .4rem 0 0; }
+.bill-totals { border: 1px solid var(--color-border); border-radius: 8px; padding: .6rem 1rem; margin: .6rem 0; background: var(--color-bg); }
+.bill-row { display: flex; align-items: baseline; gap: .5rem; padding: .25rem 0; flex-wrap: wrap; }
+.bill-row .bill-label { flex: 1; }
+.bill-row .bill-value { font-variant-numeric: tabular-nums; }
+.bill-row.bill-total { font-weight: 700; font-size: 1.1rem; }
+.bill-row.bill-total + .bill-row, .bill-row + .bill-row.bill-total { border-top: 1px dashed var(--color-border); }
+.bill-row .bill-tax { flex-basis: 100%; text-align: right; font-size: .8rem; font-weight: 400; color: var(--color-text-light); }
+.bill-detail > summary { cursor: pointer; font-weight: 600; font-size: .92rem; margin: .4rem 0 .6rem; }
+.bill-org { border: 1px solid var(--color-border); border-radius: 8px; padding: .7rem .9rem; margin-bottom: .7rem; background: var(--color-bg); overflow-x: auto; }
+.bill-org-head { display: flex; align-items: center; gap: .3rem; margin-bottom: .4rem; }
+.bill-org-head .ci-code { flex: 1; min-width: 0; font-weight: 600; font-size: .92rem; }
+.bill-org-head .bill-amt { font-weight: 700; font-variant-numeric: tabular-nums; }
+.bill-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.bill-table th, .bill-table td { padding: .3rem .4rem; border-top: 1px dashed var(--color-border); text-align: left; vertical-align: top; }
+.bill-table th { font-weight: 600; color: var(--color-text-light); border-top: none; white-space: nowrap; }
+.bill-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bill-table .bill-app { overflow-wrap: anywhere; }
+.bill-table .bill-exempt { display: block; white-space: normal; color: var(--color-accent); font-weight: 600; }
+.bill-table .bill-list { display: block; font-size: .78rem; color: var(--color-text-light); }
+/* スマホ幅では無料枠の列を畳む（全 Client で同じ値になりやすく、金額の列を押し出さないため）。 */
+@media (max-width: 480px) {
+  .bill-table th:nth-child(3), .bill-table td:nth-child(3) { display: none; }
+  .bill-table th, .bill-table td { padding: .3rem .25rem; }
+}

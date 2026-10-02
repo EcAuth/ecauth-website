@@ -11,6 +11,10 @@
  * 加えて「本番 / テストの対応」（parent_organization_id）と「本番の登録上限」（max_sites）を
  * 返す。サイト追加フォームはこの 2 つが無いと選択肢も残枠も出せないので、
  * 旧 GET /v1/account/clients は使わない。
+ *
+ * 「お支払い」カード（EcAuthDocs#119）は GET /v1/account/billing を一覧とは別に取り、
+ * 支払い方法の登録状況と当月の見込み額（税抜）を出す。カードの登録・管理は Stripe の
+ * Checkout / Customer Portal に任せ、ここでは遷移先 URL を受け取って移るだけ。
  */
 (function () {
   'use strict';
@@ -1036,10 +1040,261 @@
     return true;
   }
 
+  // --- お支払い（EcAuthDocs#119）---
+
+  var BILLING_PATH = '/v1/account/billing';
+  var billingCard = App.$('#billing-card');
+  var billingNotice = App.$('#billing-notice');
+  var billingPayment = App.$('#billing-payment');
+  var billingEstimate = App.$('#billing-estimate');
+  var billingStatus = App.$('#billing-status');
+
+  /*
+   * 請求しない理由（サーバの IBillingService.ExemptReasons）。organization_not_billable は
+   * テストサイト・内部用・対象月前に削除したサイトをまとめたものなので、テストサイトだけ
+   * 理由を具体的に書く。
+   */
+  function exemptLabel(reason, org) {
+    switch (reason) {
+      case 'first_month': return '初月無料';
+      case 'organization_not_billable': return org.is_sandbox ? 'テストサイトは無料' : '請求対象外';
+      case 'client_exempt':
+      case 'account_exempt': return '請求対象外';
+      default: return '請求対象外';
+    }
+  }
+
+  function yen(n) { return Number(n || 0).toLocaleString('ja-JP') + ' 円'; }
+
+  // 日時は JST で出す（請求の月の区切りも JST のため）。
+  function jstParts(iso) {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return null;
+    var parts = {};
+    new Intl.DateTimeFormat('ja-JP', {
+      timeZone: 'Asia/Tokyo', year: 'numeric', month: 'numeric', day: 'numeric',
+      hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+    }).formatToParts(d).forEach(function (p) { parts[p.type] = p.value; });
+    return parts;
+  }
+  function jstDate(iso) {
+    var p = jstParts(iso);
+    return p ? p.year + '/' + p.month + '/' + p.day : '';
+  }
+  function jstDateTime(iso) {
+    var p = jstParts(iso);
+    return p ? p.month + '/' + p.day + ' ' + p.hour + ':' + p.minute : '';
+  }
+  function monthLabel(yearMonth) {
+    var m = /^(\d{4})-(\d{2})$/.exec(yearMonth || '');
+    return m ? m[1] + ' 年 ' + Number(m[2]) + ' 月' : '当月';
+  }
+
+  /*
+   * Checkout / Customer Portal の URL を作らせて移る。移る間はボタンを押せないままにする
+   * （戻る前に 2 回押すと Checkout Session が 2 つできる）。
+   */
+  async function goToStripe(btn, path) {
+    App.clearStatus(billingStatus);
+    btn.disabled = true;
+    var original = btn.textContent;
+    btn.textContent = '移動中…';
+
+    var res = await authFetch('POST', path);
+    if (res.status === 401) { requireLogin(); return; }
+
+    var url = res.ok && res.data && typeof res.data.url === 'string' ? res.data.url : '';
+    if (/^https:\/\//.test(url)) {
+      window.location.href = url;
+      return;
+    }
+
+    btn.disabled = false;
+    btn.textContent = original;
+    // Portal は支払い方法が無いと 409（Webhook の反映前に別タブで外した等）。登録ボタンに戻す。
+    if (res.status === 409) {
+      renderPayment({ payment_method_registered: false });
+      App.setStatus(billingStatus, 'err',
+        descriptionOf(res) || '支払い方法が登録されていません。登録してからお試しください。');
+      return;
+    }
+    App.setStatus(billingStatus, 'err', res.networkError
+      ? 'ネットワークエラーが発生しました。時間をおいて再度お試しください。'
+      : (descriptionOf(res) || 'お支払いの画面を開けませんでした。時間をおいて再度お試しください。'));
+  }
+
+  function renderPayment(data) {
+    billingPayment.textContent = '';
+    var registered = !!data.payment_method_registered;
+
+    var state = el('p', 'bill-state');
+    state.appendChild(document.createTextNode('支払い方法: '));
+    state.appendChild(el('strong', registered ? 'bill-ok' : 'bill-none', registered ? '登録済み' : '未登録'));
+    if (registered && data.payment_method_registered_at) {
+      state.appendChild(document.createTextNode('（' + jstDate(data.payment_method_registered_at) + ' 登録）'));
+    }
+    billingPayment.appendChild(state);
+
+    billingPayment.appendChild(el('p', 'bill-note', registered
+      ? 'カードの変更や請求書の確認は、Stripe の画面で行います。'
+      : '無料枠を超えた分の利用料は、前月分を毎月初めにご登録のクレジットカードへ請求します。カードの登録は Stripe の画面で行います。'));
+
+    var btn = el('button', registered ? 'btn secondary small' : 'btn primary small',
+      registered ? '支払い情報を管理' : '支払い方法を登録');
+    btn.type = 'button';
+    btn.id = registered ? 'billing-portal-btn' : 'billing-checkout-btn';
+    btn.addEventListener('click', function () {
+      goToStripe(btn, BILLING_PATH + (registered ? '/portal' : '/checkout'));
+    });
+    billingPayment.appendChild(btn);
+  }
+
+  function makeClientRow(client, org) {
+    var tr = document.createElement('tr');
+    tr.appendChild(el('td', 'bill-app', client.app_name || client.client_id));
+    tr.appendChild(el('td', 'num', String(client.monthly_active_users)));
+    tr.appendChild(el('td', 'num', String(client.free_tier_mau)));
+    tr.appendChild(el('td', 'num', String(client.billable_units)));
+    var amount = el('td', 'num');
+    if (client.is_billable) {
+      amount.textContent = yen(client.amount_jpy);
+    } else {
+      amount.appendChild(el('span', 'bill-exempt', exemptLabel(client.exempt_reason, org)));
+      // 請求しない Client も、料金表どおりならいくらだったかを参考に見せる。
+      if (client.list_price_jpy > 0) {
+        amount.appendChild(el('span', 'bill-list', '通常 ' + yen(client.list_price_jpy)));
+      }
+    }
+    tr.appendChild(amount);
+    return tr;
+  }
+
+  function makeOrgBreakdown(org) {
+    var box = el('div', 'bill-org');
+    box.setAttribute('data-org-id', String(org.organization_id));
+
+    var head = el('div', 'bill-org-head');
+    head.appendChild(el('span', 'obadge ' + (org.is_sandbox ? 'sand' : 'prod'), org.is_sandbox ? 'テスト' : '本番'));
+    head.appendChild(el('span', 'ci-code', org.code));
+    head.appendChild(el('span', 'bill-amt', yen(org.amount_jpy)));
+    box.appendChild(head);
+
+    var table = el('table', 'bill-table');
+    var thead = document.createElement('thead');
+    var hr = document.createElement('tr');
+    [['アプリ', ''], ['MAU', 'num'], ['無料枠', 'num'], ['超過', 'num'], ['金額', 'num']].forEach(function (h) {
+      hr.appendChild(el('th', h[1], h[0]));
+    });
+    thead.appendChild(hr);
+    table.appendChild(thead);
+    var tbody = document.createElement('tbody');
+    (org.clients || []).forEach(function (c) { tbody.appendChild(makeClientRow(c, org)); });
+    table.appendChild(tbody);
+    box.appendChild(table);
+    return box;
+  }
+
+  function makeTotalRow(label, value, cls) {
+    var row = el('div', 'bill-row' + (cls ? ' ' + cls : ''));
+    row.appendChild(el('span', 'bill-label', label));
+    row.appendChild(el('span', 'bill-value', value));
+    return row;
+  }
+
+  function renderEstimate(est) {
+    billingEstimate.textContent = '';
+    billingEstimate.appendChild(el('h3', 'bill-h', monthLabel(est.year_month) + 'の見込み額'));
+    if (est.as_of) {
+      billingEstimate.appendChild(el('p', 'bill-note',
+        jstDateTime(est.as_of) + ' 時点の利用状況から計算しています。月末までに増えることがあります。'));
+    }
+
+    var plan = est.plan || {};
+    if (plan.exempt) {
+      billingEstimate.appendChild(el('p', 'bill-exempt-all', 'お客様のアカウントは請求対象外のため、利用料はかかりません。'));
+      return;
+    }
+
+    var totals = el('div', 'bill-totals');
+    if (est.discount_jpy > 0) {
+      totals.appendChild(makeTotalRow('小計', yen(est.subtotal_jpy)));
+      totals.appendChild(makeTotalRow(
+        plan.discount_percent ? '割引（' + plan.discount_percent + '%）' : '割引',
+        '−' + yen(est.discount_jpy), 'bill-discount'));
+    }
+    var total = makeTotalRow('合計', yen(est.total_jpy), 'bill-total');
+    total.appendChild(el('span', 'bill-tax', '（税抜・別途消費税）'));
+    totals.appendChild(total);
+    billingEstimate.appendChild(totals);
+    billingEstimate.appendChild(el('p', 'bill-note', '金額は税抜です。請求時に消費税（10%）を加えます。'));
+
+    var orgs = est.organizations || [];
+    if (orgs.length === 0) return;
+
+    var details = el('details', 'bill-detail');
+    details.appendChild(el('summary', null, 'サイト別の内訳'));
+    var custom = orgs.some(function (o) {
+      return (o.clients || []).some(function (c) { return c.custom_pricing; });
+    });
+    if (custom) {
+      details.appendChild(el('p', 'bill-note', 'お客様向けの個別の料金表で計算しています。'));
+    }
+    orgs.forEach(function (o) { details.appendChild(makeOrgBreakdown(o)); });
+    billingEstimate.appendChild(details);
+  }
+
+  /*
+   * Checkout から戻った印（?billing=...）を読み取り、URL からは消す。再読み込みや
+   * ブックマークで「登録しました」が繰り返し出ないようにするため。
+   */
+  function takeBillingOutcome() {
+    var params = new URLSearchParams(window.location.search);
+    var outcome = params.get('billing');
+    if (outcome === null) return null;
+    params.delete('billing');
+    var query = params.toString();
+    window.history.replaceState(null, '',
+      window.location.pathname + (query ? '?' + query : '') + window.location.hash);
+    return outcome;
+  }
+
+  /*
+   * 一覧とは別に取る。失敗してもサイト一覧の表示は止めない。
+   * 404 は課金 API が無効（Billing:Enabled=false）なのでカードごと出さない。
+   * Checkout から戻った直後は refresh=1 で Stripe と同期させる（Webhook より先に描画されるため）。
+   */
+  async function loadBilling(outcome) {
+    var path = BILLING_PATH + (outcome === 'setup_complete' ? '?refresh=1' : '');
+    var res = await authFetch('GET', path);
+    if (res.status === 401) { requireLogin(); return; }
+    if (res.status === 404) { hide(billingCard); return; }
+    show(billingCard);
+    if (!res.ok || !res.data || !res.data.estimate) {
+      App.setStatus(billingStatus, 'err', 'お支払い情報の取得に失敗しました。時間をおいて再度お試しください。');
+      return;
+    }
+
+    renderPayment(res.data);
+    renderEstimate(res.data.estimate);
+
+    if (outcome === 'setup_complete') {
+      if (res.data.payment_method_registered) {
+        App.setStatus(billingNotice, 'ok', '支払い方法を登録しました。');
+      } else {
+        App.setStatus(billingNotice, 'info',
+          '登録の反映に時間がかかっています。しばらくしてからページを再読み込みしてください。');
+      }
+    } else if (outcome === 'setup_cancelled') {
+      App.setStatus(billingNotice, 'info', '支払い方法の登録を取り消しました。');
+    }
+  }
+
   // --- 初期化 ---
   (function init() {
     var token = sessionStorage.getItem(AT_KEY);
     if (!token) { requireLogin(); return; }
+    var outcome = takeBillingOutcome();
     loadSites();
+    loadBilling(outcome);
   })();
 })();
