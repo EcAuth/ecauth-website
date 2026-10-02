@@ -2170,6 +2170,30 @@ test.describe('認証済', () => {
 
       await expect(card(page).locator('#billing-notice')).toHaveClass(/info/);
       await expect(card(page).locator('#billing-notice')).toContainText('反映に時間がかかっています');
+      // 案内どおり再読み込みしたら、もう一度 Stripe と同期できるよう印を残す。
+      await expect(page).toHaveURL(/\/mypage\/\?billing=setup_complete$/);
+      await page.reload();
+      await expect(card(page).locator('#billing-notice')).toBeVisible();
+      expect(billingGets()).toHaveLength(2);
+      expect(new URL(billingGets()[1].url).searchParams.get('refresh')).toBe('1');
+    });
+
+    test('戻った直後の同期に失敗したら印を残し、再読み込みで同期し直す', async ({ page }) => {
+      stubDefaultList();
+      let fail = true;
+      mock.on(BILLING_PATH, () => (fail
+        ? { status: 500, body: { error: 'server_error' } }
+        : { status: 200, body: billingBody(REGISTERED) }));
+
+      await page.goto('/mypage/?billing=setup_complete');
+      await expect(card(page).locator('#billing-status')).toHaveClass(/err/);
+      await expect(page).toHaveURL(/\/mypage\/\?billing=setup_complete$/);
+
+      fail = false;
+      await page.reload();
+      await expect(card(page).locator('#billing-notice')).toHaveText('支払い方法を登録しました。');
+      expect(new URL(billingGets()[1].url).searchParams.get('refresh')).toBe('1');
+      await expect(page).toHaveURL(/\/mypage\/$/);
     });
 
     test('Checkout を取り消して戻ったら、その旨だけを伝えて同期はしない', async ({ page }) => {
@@ -2210,13 +2234,32 @@ test.describe('認証済', () => {
       // 一覧を描き直してはいけない（トークンは消えているのに画面だけ残る）。
       let billingAnswered!: () => void;
       const answered = new Promise<void>((resolve) => { billingAnswered = resolve; });
-      let listAnswered = false;
       // stubOrganizations の list は同期関数なので、遅らせるためにパスへ直接登録する。
       mock.on(ORGANIZATIONS_PATH, async () => {
         await answered;
         await new Promise((r) => setTimeout(r, 300));
-        listAnswered = true;
         return { status: 200, body: DEFAULT_BODY };
+      });
+      // 一覧の応答をページの JS が処理し終えた印。モック側で返した時点ではまだ描画前なので、
+      // 一覧の res.json() が解決した後のマクロタスクで立てる（loadSites の続きはその前の
+      // マイクロタスクで同期的に走り終える）。
+      await page.addInitScript(() => {
+        const original = window.fetch.bind(window);
+        window.fetch = async (...args: Parameters<typeof fetch>) => {
+          const res = await original(...args);
+          const url = args[0] instanceof Request ? args[0].url : String(args[0]);
+          if (new URL(url).pathname === '/v1/account/organizations') {
+            const json = res.json.bind(res);
+            res.json = async () => {
+              try {
+                return await json();
+              } finally {
+                setTimeout(() => { (window as unknown as { __listHandled?: boolean }).__listHandled = true; }, 0);
+              }
+            };
+          }
+          return res;
+        };
       });
       mock.on(BILLING_PATH, () => {
         billingAnswered();
@@ -2225,9 +2268,7 @@ test.describe('認証済', () => {
 
       await page.goto('/mypage/');
       await expect(page.locator('#login-view')).toBeVisible();
-      await expect.poll(() => listAnswered).toBe(true);
-      // 一覧の応答をブラウザが処理し終えるまで待ってから確かめる。
-      await page.waitForTimeout(300);
+      await page.waitForFunction(() => (window as unknown as { __listHandled?: boolean }).__listHandled === true);
 
       await expect(page.locator('#login-view')).toBeVisible();
       await expect(page.locator('#app-view')).toBeHidden();

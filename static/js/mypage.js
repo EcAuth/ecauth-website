@@ -1254,18 +1254,22 @@
   }
 
   /*
-   * Checkout から戻った印（?billing=...）を読み取り、URL からは消す。再読み込みや
-   * ブックマークで「登録しました」が繰り返し出ないようにするため。
+   * Checkout から戻った印（?billing=...）。消すのは loadBilling が処理し終えてから
+   * （clearBillingOutcome）。取得に失敗した・まだ未登録のまま再読み込みを案内した、という
+   * 場合に印が残っていれば、再読み込みでもう一度 refresh=1 で同期できる。
    */
-  function takeBillingOutcome() {
+  function readBillingOutcome() {
+    return new URLSearchParams(window.location.search).get('billing');
+  }
+
+  // 処理済みの印を URL から消す。再読み込みやブックマークで「登録しました」が繰り返し出ないようにするため。
+  function clearBillingOutcome() {
     var params = new URLSearchParams(window.location.search);
-    var outcome = params.get('billing');
-    if (outcome === null) return null;
+    if (!params.has('billing')) return;
     params.delete('billing');
     var query = params.toString();
     window.history.replaceState(null, '',
       window.location.pathname + (query ? '?' + query : '') + window.location.hash);
-    return outcome;
   }
 
   /*
@@ -1278,7 +1282,7 @@
     var res = await authFetch('GET', path);
     if (loggedOut) return;
     if (res.status === 401) { requireLogin(); return; }
-    if (res.status === 404) { hide(billingCard); return; }
+    if (res.status === 404) { hide(billingCard); clearBillingOutcome(); return; }
     show(billingCard);
     if (!res.ok || !res.data || !res.data.estimate) {
       App.setStatus(billingStatus, 'err', 'お支払い情報の取得に失敗しました。時間をおいて再度お試しください。');
@@ -1292,19 +1296,22 @@
       if (res.data.payment_method_registered) {
         App.setStatus(billingNotice, 'ok', '支払い方法を登録しました。');
       } else {
+        // 印を残し、案内どおりの再読み込みでもう一度 refresh=1 を送らせる。
         App.setStatus(billingNotice, 'info',
           '登録の反映に時間がかかっています。しばらくしてからページを再読み込みしてください。');
+        return;
       }
     } else if (outcome === 'setup_cancelled') {
       App.setStatus(billingNotice, 'info', '支払い方法の登録を取り消しました。');
     }
+    clearBillingOutcome();
   }
 
   // --- 初期化 ---
   (function init() {
     var token = sessionStorage.getItem(AT_KEY);
     if (!token) { requireLogin(); return; }
-    var outcome = takeBillingOutcome();
+    var outcome = readBillingOutcome();
     loadSites();
     loadBilling(outcome);
   })();
