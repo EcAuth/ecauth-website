@@ -36,6 +36,8 @@ test.beforeEach(async ({ page }) => {
     status: 200,
     body: { organizations: [], max_sites: 10, production_site_count: 0 },
   });
+  // お支払いカードの課金 API も並行して呼ぶ。無効（404）にしてカードを出さない。
+  mock.on('/v1/account/billing', { status: 404, body: { error: 'not_found' } });
 });
 
 test.afterEach(async () => {

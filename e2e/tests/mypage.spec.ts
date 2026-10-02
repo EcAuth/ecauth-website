@@ -41,6 +41,10 @@ const revealPath = (id: number) => `/v1/account/clients/${id}/secret/reveal`;
 const regeneratePath = (id: number) => `/v1/account/clients/${id}/secret`;
 const redirectUrisPath = (id: number) => `/v1/account/clients/${id}/redirect-uris`;
 const allowedRpIdsPath = (id: number) => `/v1/account/clients/${id}/allowed-rp-ids`;
+/** お支払い（EcAuthDocs#119）。クエリ（refresh=1）は ApiMock のパス照合に含まれない。 */
+const BILLING_PATH = '/v1/account/billing';
+const CHECKOUT_PATH = '/v1/account/billing/checkout';
+const PORTAL_PATH = '/v1/account/billing/portal';
 
 /** Organization.Id。カードの data-org-id と、削除・親指定の API パスに使う。 */
 const PROD_ORG_ID = 101;
@@ -263,6 +267,8 @@ test.describe('未認証', () => {
 test.describe('認証済', () => {
   test.beforeEach(async ({ page }) => {
     await seedSession(page, { [AT_KEY]: ACCESS_TOKEN });
+    // マイページは一覧と並行して課金 API も呼ぶ。課金を扱わないテストでは無効（404 = カード非表示）にしておく。
+    mock.on(BILLING_PATH, { status: 404, body: { error: 'not_found' } });
   });
 
   test('アクセストークンを Bearer で送り、サイト一覧を表示する', async ({ page }) => {
@@ -1810,6 +1816,483 @@ test.describe('認証済', () => {
       await expect(section.locator('.row-input').first()).toBeEnabled();
       await expect(section.locator('.row-add')).toBeEnabled();
       await expect(section.locator('.row-save')).toBeEnabled();
+    });
+  });
+
+  /*
+   * お支払い（EcAuthDocs#119）。GET /v1/account/billing で支払い方法の登録状況と当月の見込み額
+   * （税抜）を出し、登録・管理は Stripe の Checkout / Customer Portal へ移る。
+   * 見込み額は税抜で、消費税は請求時に Stripe の TaxRate で付くため「別途消費税」と明示する。
+   */
+  test.describe('お支払い', () => {
+    const CHECKOUT_URL = 'https://checkout.stripe.com/c/pay/cs_test_e2e';
+    const PORTAL_URL = 'https://billing.stripe.com/p/session/test_e2e';
+
+    interface BillingClient {
+      id: number;
+      client_id: string;
+      app_name: string;
+      subject_type: string;
+      monthly_active_users: number;
+      free_tier_mau: number;
+      billable_units: number;
+      list_price_jpy: number;
+      amount_jpy: number;
+      is_billable: boolean;
+      exempt_reason: string | null;
+      custom_pricing: boolean;
+    }
+
+    function billingClient(overrides: Partial<BillingClient> & Pick<BillingClient, 'id' | 'client_id'>): BillingClient {
+      return {
+        app_name: 'EC-CUBE',
+        subject_type: 'b2b',
+        monthly_active_users: 0,
+        free_tier_mau: 5,
+        billable_units: 0,
+        list_price_jpy: 0,
+        amount_jpy: 0,
+        is_billable: true,
+        exempt_reason: null,
+        custom_pricing: false,
+        ...overrides,
+      };
+    }
+
+    /** 本番 1（MAU 16 → 超過 11 人 × 100 円）+ テスト 1（請求対象外）。 */
+    function billingBody(overrides: Record<string, unknown> = {}, estimate: Record<string, unknown> = {}) {
+      return {
+        payment_method_registered: false,
+        payment_method_registered_at: null,
+        has_stripe_customer: false,
+        ...overrides,
+        estimate: {
+          year_month: '2026-10',
+          as_of: '2026-10-02T05:30:00+00:00',
+          subtotal_jpy: 1100,
+          discount_jpy: 0,
+          total_jpy: 1100,
+          plan: { exempt: false, discount_percent: null, discount_jpy: null, custom_b2b_pricing: false, custom_b2c_pricing: false },
+          organizations: [
+            {
+              organization_id: PROD_ORG_ID,
+              code: 'shop-example-com',
+              name: 'サンプル株式会社',
+              is_sandbox: false,
+              is_billable: true,
+              amount_jpy: 1100,
+              clients: [
+                billingClient({
+                  id: PROD_ID,
+                  client_id: 'prod-client-id',
+                  app_name: '本番サイト',
+                  monthly_active_users: 16,
+                  billable_units: 11,
+                  list_price_jpy: 1100,
+                  amount_jpy: 1100,
+                }),
+              ],
+            },
+            {
+              organization_id: SANDBOX_ORG_ID,
+              code: 'stg-shop-example-com',
+              name: 'サンプル株式会社',
+              is_sandbox: true,
+              is_billable: false,
+              amount_jpy: 0,
+              clients: [
+                billingClient({
+                  id: SANDBOX_ID,
+                  client_id: 'sandbox-client-id',
+                  app_name: 'テストサイト',
+                  monthly_active_users: 3,
+                  is_billable: false,
+                  exempt_reason: 'organization_not_billable',
+                }),
+              ],
+            },
+          ],
+          ...estimate,
+        },
+      };
+    }
+
+    const REGISTERED = {
+      payment_method_registered: true,
+      // JST では 2026/10/1。
+      payment_method_registered_at: '2026-09-30T16:00:00+00:00',
+      has_stripe_customer: true,
+    };
+
+    function card(page: Page): Locator {
+      return page.locator('#billing-card');
+    }
+
+    function billingGets(): RecordedRequest[] {
+      return mock.callsTo(BILLING_PATH).filter((c) => c.method === 'GET');
+    }
+
+    /** Stripe の画面は対象外。遷移したことだけを確かめるため空ページで受ける。 */
+    async function stubStripePages(page: Page): Promise<void> {
+      for (const origin of ['https://checkout.stripe.com', 'https://billing.stripe.com']) {
+        await page.route(`${origin}/**`, (route) =>
+          route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><html><body>stripe stub</body></html>' })
+        );
+      }
+    }
+
+    test('課金 API が無効（404）ならカードを出さず、サイト一覧はそのまま表示する', async ({ page }) => {
+      stubDefaultList();
+
+      await page.goto('/mypage/');
+
+      await expect(page.locator('.client-item')).toHaveCount(2);
+      expect(billingGets()).toHaveLength(1);
+      await expect(card(page)).toBeHidden();
+    });
+
+    test('未登録なら「支払い方法を登録」を出し、見込み額を税抜・別途消費税で表示する', async ({ page }) => {
+      stubDefaultList();
+      mock.on(BILLING_PATH, { status: 200, body: billingBody() });
+
+      await page.goto('/mypage/');
+
+      await expect(card(page)).toBeVisible();
+      expect(authorizationOf(billingGets()[0])).toBe(`Bearer ${ACCESS_TOKEN}`);
+      // Checkout から戻ったのでなければ Stripe と同期しない（refresh を付けない）。
+      expect(new URL(billingGets()[0].url).searchParams.get('refresh')).toBeNull();
+
+      await expect(card(page).locator('.bill-state')).toHaveText('支払い方法: 未登録');
+      await expect(card(page).locator('#billing-checkout-btn')).toHaveText('支払い方法を登録');
+      await expect(card(page).locator('#billing-portal-btn')).toHaveCount(0);
+
+      await expect(card(page).locator('.bill-h')).toHaveText('2026 年 10 月の見込み額');
+      await expect(card(page)).toContainText('10/2 14:30 時点の利用状況');
+      // 割引が無ければ小計・割引の行は出さず、合計 1 行だけ。
+      await expect(card(page).locator('.bill-row')).toHaveCount(1);
+      await expect(card(page).locator('.bill-total')).toContainText('合計1,100 円（税抜・別途消費税）');
+      await expect(card(page)).toContainText('請求時に消費税（10%）を加えます');
+    });
+
+    test('内訳はサイトごとに Client の MAU・無料枠・超過・金額と、請求しない理由を出す', async ({ page }) => {
+      stubDefaultList();
+      mock.on(BILLING_PATH, { status: 200, body: billingBody() });
+
+      await page.goto('/mypage/');
+      const detail = card(page).locator('.bill-detail');
+      await expect(detail.locator('.bill-org').first()).toBeHidden();
+      await detail.locator('summary').click();
+
+      const prod = detail.locator(`.bill-org[data-org-id="${PROD_ORG_ID}"]`);
+      await expect(prod.locator('.obadge')).toHaveText('本番');
+      await expect(prod.locator('.ci-code')).toHaveText('shop-example-com');
+      await expect(prod.locator('.bill-amt')).toHaveText('1,100 円');
+      await expect(prod.locator('tbody tr td')).toHaveText(['本番サイト', '16', '5', '11', '1,100 円']);
+
+      const sandbox = detail.locator(`.bill-org[data-org-id="${SANDBOX_ORG_ID}"]`);
+      await expect(sandbox.locator('.obadge')).toHaveText('テスト');
+      await expect(sandbox.locator('.bill-exempt')).toHaveText('テストサイトは無料');
+      // 料金表どおりでも 0 円なら「通常 …」は出さない。
+      await expect(sandbox.locator('.bill-list')).toHaveCount(0);
+    });
+
+    test('初月無料の Client は理由と、通常ならかかった金額を出す', async ({ page }) => {
+      stubDefaultList();
+      const body = billingBody({}, { subtotal_jpy: 0, total_jpy: 0 });
+      const prodOrg = (body.estimate.organizations as Array<Record<string, unknown>>)[0];
+      prodOrg.amount_jpy = 0;
+      prodOrg.clients = [
+        billingClient({
+          id: PROD_ID,
+          client_id: 'prod-client-id',
+          app_name: '本番サイト',
+          monthly_active_users: 16,
+          billable_units: 11,
+          list_price_jpy: 1100,
+          amount_jpy: 0,
+          is_billable: false,
+          exempt_reason: 'first_month',
+        }),
+      ];
+      mock.on(BILLING_PATH, { status: 200, body });
+
+      await page.goto('/mypage/');
+      await card(page).locator('.bill-detail summary').click();
+
+      const prod = card(page).locator(`.bill-org[data-org-id="${PROD_ORG_ID}"]`);
+      await expect(prod.locator('.bill-exempt')).toHaveText('初月無料');
+      await expect(prod.locator('.bill-list')).toHaveText('通常 1,100 円');
+      await expect(card(page).locator('.bill-total')).toContainText('合計0 円');
+    });
+
+    test('割引があれば小計・割引・合計の 3 行に分ける', async ({ page }) => {
+      stubDefaultList();
+      mock.on(BILLING_PATH, {
+        status: 200,
+        body: billingBody({}, {
+          subtotal_jpy: 1100,
+          discount_jpy: 110,
+          total_jpy: 990,
+          plan: { exempt: false, discount_percent: 10, discount_jpy: null, custom_b2b_pricing: false, custom_b2c_pricing: false },
+        }),
+      });
+
+      await page.goto('/mypage/');
+
+      const rows = card(page).locator('.bill-row');
+      await expect(rows).toHaveCount(3);
+      await expect(rows.nth(0)).toHaveText('小計1,100 円');
+      await expect(rows.nth(1)).toHaveText('割引（10%）−110 円');
+      await expect(rows.nth(2)).toContainText('合計990 円');
+    });
+
+    test('アカウントが請求対象外なら、その旨だけを出して金額と内訳は出さない', async ({ page }) => {
+      stubDefaultList();
+      mock.on(BILLING_PATH, {
+        status: 200,
+        body: billingBody({}, {
+          subtotal_jpy: 0,
+          total_jpy: 0,
+          plan: { exempt: true, discount_percent: null, discount_jpy: null, custom_b2b_pricing: false, custom_b2c_pricing: false },
+        }),
+      });
+
+      await page.goto('/mypage/');
+
+      await expect(card(page).locator('.bill-exempt-all')).toHaveText('お客様のアカウントは請求対象外のため、利用料はかかりません。');
+      await expect(card(page).locator('.bill-totals')).toHaveCount(0);
+      await expect(card(page).locator('.bill-detail')).toHaveCount(0);
+    });
+
+    test('「支払い方法を登録」で Checkout を作らせ、返った URL へ移る', async ({ page }) => {
+      await stubStripePages(page);
+      stubDefaultList();
+      mock.on(BILLING_PATH, { status: 200, body: billingBody() });
+      mock.on(CHECKOUT_PATH, { status: 200, body: { url: CHECKOUT_URL } });
+
+      await page.goto('/mypage/');
+      await card(page).locator('#billing-checkout-btn').click();
+      await page.waitForURL(CHECKOUT_URL);
+
+      const calls = mock.callsTo(CHECKOUT_PATH);
+      expect(calls).toHaveLength(1);
+      expect(calls[0].method).toBe('POST');
+      expect(authorizationOf(calls[0])).toBe(`Bearer ${ACCESS_TOKEN}`);
+    });
+
+    test('Checkout を作れなければボタンを戻してエラーを出す', async ({ page }) => {
+      stubDefaultList();
+      mock.on(BILLING_PATH, { status: 200, body: billingBody() });
+      mock.on(CHECKOUT_PATH, { status: 500, body: { error: 'server_error' } });
+
+      await page.goto('/mypage/');
+      const btn = card(page).locator('#billing-checkout-btn');
+      await btn.click();
+
+      await expect(card(page).locator('#billing-status')).toHaveClass(/err/);
+      await expect(card(page).locator('#billing-status')).toContainText('お支払いの画面を開けませんでした');
+      await expect(btn).toBeEnabled();
+      await expect(btn).toHaveText('支払い方法を登録');
+      await expect(page).toHaveURL(/\/mypage\/$/);
+    });
+
+    test('https でない URL が返っても移らない', async ({ page }) => {
+      stubDefaultList();
+      mock.on(BILLING_PATH, { status: 200, body: billingBody() });
+      mock.on(CHECKOUT_PATH, { status: 200, body: { url: 'javascript:alert(1)' } });
+
+      await page.goto('/mypage/');
+      await card(page).locator('#billing-checkout-btn').click();
+
+      await expect(card(page).locator('#billing-status')).toHaveClass(/err/);
+      await expect(page).toHaveURL(/\/mypage\/$/);
+    });
+
+    test('登録済みなら登録日と「支払い情報を管理」を出し、Customer Portal へ移る', async ({ page }) => {
+      await stubStripePages(page);
+      stubDefaultList();
+      mock.on(BILLING_PATH, { status: 200, body: billingBody(REGISTERED) });
+      mock.on(PORTAL_PATH, { status: 200, body: { url: PORTAL_URL } });
+
+      await page.goto('/mypage/');
+
+      await expect(card(page).locator('.bill-state')).toHaveText('支払い方法: 登録済み（2026/10/1 登録）');
+      await expect(card(page).locator('#billing-checkout-btn')).toHaveCount(0);
+      await card(page).locator('#billing-portal-btn').click();
+      await page.waitForURL(PORTAL_URL);
+
+      const calls = mock.callsTo(PORTAL_PATH);
+      expect(calls).toHaveLength(1);
+      expect(calls[0].method).toBe('POST');
+    });
+
+    test('Portal が 409（支払い方法なし）なら理由を出し、登録ボタンに切り替える', async ({ page }) => {
+      stubDefaultList();
+      mock.on(BILLING_PATH, { status: 200, body: billingBody(REGISTERED) });
+      mock.on(PORTAL_PATH, {
+        status: 409,
+        body: { error: 'no_payment_method', error_description: '支払い方法が登録されていません。' },
+      });
+
+      await page.goto('/mypage/');
+      await card(page).locator('#billing-portal-btn').click();
+
+      await expect(card(page).locator('#billing-status')).toHaveText('支払い方法が登録されていません。');
+      await expect(card(page).locator('.bill-state')).toHaveText('支払い方法: 未登録');
+      await expect(card(page).locator('#billing-checkout-btn')).toBeVisible();
+    });
+
+    test('Checkout から戻ったら refresh=1 で取り直し、完了を伝えて URL から印を消す', async ({ page }) => {
+      stubDefaultList();
+      mock.on(BILLING_PATH, { status: 200, body: billingBody(REGISTERED) });
+
+      await page.goto('/mypage/?billing=setup_complete');
+
+      await expect(card(page).locator('#billing-notice')).toHaveClass(/ok/);
+      await expect(card(page).locator('#billing-notice')).toHaveText('支払い方法を登録しました。');
+      expect(billingGets()).toHaveLength(1);
+      expect(new URL(billingGets()[0].url).searchParams.get('refresh')).toBe('1');
+      await expect(page).toHaveURL(/\/mypage\/$/);
+
+      // 再読み込みでは同期も完了表示も繰り返さない。
+      await page.reload();
+      await expect(card(page).locator('.bill-state')).toBeVisible();
+      expect(billingGets()).toHaveLength(2);
+      expect(new URL(billingGets()[1].url).searchParams.get('refresh')).toBeNull();
+      await expect(card(page).locator('#billing-notice')).toBeHidden();
+    });
+
+    test('戻った直後でもまだ未登録なら、反映待ちであることを伝える', async ({ page }) => {
+      stubDefaultList();
+      mock.on(BILLING_PATH, { status: 200, body: billingBody() });
+
+      await page.goto('/mypage/?billing=setup_complete');
+
+      await expect(card(page).locator('#billing-notice')).toHaveClass(/info/);
+      await expect(card(page).locator('#billing-notice')).toContainText('反映に時間がかかっています');
+      // 案内どおり再読み込みしたら、もう一度 Stripe と同期できるよう印を残す。
+      await expect(page).toHaveURL(/\/mypage\/\?billing=setup_complete$/);
+      await page.reload();
+      await expect(card(page).locator('#billing-notice')).toBeVisible();
+      expect(billingGets()).toHaveLength(2);
+      expect(new URL(billingGets()[1].url).searchParams.get('refresh')).toBe('1');
+    });
+
+    test('戻った直後の同期に失敗したら印を残し、再読み込みで同期し直す', async ({ page }) => {
+      stubDefaultList();
+      let fail = true;
+      mock.on(BILLING_PATH, () => (fail
+        ? { status: 500, body: { error: 'server_error' } }
+        : { status: 200, body: billingBody(REGISTERED) }));
+
+      await page.goto('/mypage/?billing=setup_complete');
+      await expect(card(page).locator('#billing-status')).toHaveClass(/err/);
+      await expect(page).toHaveURL(/\/mypage\/\?billing=setup_complete$/);
+
+      fail = false;
+      await page.reload();
+      await expect(card(page).locator('#billing-notice')).toHaveText('支払い方法を登録しました。');
+      expect(new URL(billingGets()[1].url).searchParams.get('refresh')).toBe('1');
+      await expect(page).toHaveURL(/\/mypage\/$/);
+    });
+
+    test('Checkout を取り消して戻ったら、その旨だけを伝えて同期はしない', async ({ page }) => {
+      stubDefaultList();
+      mock.on(BILLING_PATH, { status: 200, body: billingBody() });
+
+      await page.goto('/mypage/?billing=setup_cancelled');
+
+      await expect(card(page).locator('#billing-notice')).toHaveText('支払い方法の登録を取り消しました。');
+      expect(new URL(billingGets()[0].url).searchParams.get('refresh')).toBeNull();
+      await expect(page).toHaveURL(/\/mypage\/$/);
+    });
+
+    test('取得に失敗してもサイト一覧は表示し、カードにエラーを出す', async ({ page }) => {
+      stubDefaultList();
+      mock.on(BILLING_PATH, { status: 500, body: { error: 'server_error' } });
+
+      await page.goto('/mypage/');
+
+      await expect(page.locator('.client-item')).toHaveCount(2);
+      await expect(card(page)).toBeVisible();
+      await expect(card(page).locator('#billing-status')).toHaveClass(/err/);
+      await expect(card(page).locator('#billing-checkout-btn')).toHaveCount(0);
+    });
+
+    test('401 ならトークンを破棄してログイン画面に戻す', async ({ page }) => {
+      stubDefaultList();
+      mock.on(BILLING_PATH, { status: 401, body: { error: 'invalid_token' } });
+
+      await page.goto('/mypage/');
+
+      await expect(page.locator('#login-view')).toBeVisible();
+      expect(await readSession(page, AT_KEY)).toBeNull();
+    });
+
+    test('課金が先に 401 で返ったら、遅れて成功した一覧でログイン前の画面に戻さない', async ({ page }) => {
+      // 一覧と課金は並行して取る。課金の 401 でログイン画面に戻した後に一覧の成功が届いても、
+      // 一覧を描き直してはいけない（トークンは消えているのに画面だけ残る）。
+      let billingAnswered!: () => void;
+      const answered = new Promise<void>((resolve) => { billingAnswered = resolve; });
+      // stubOrganizations の list は同期関数なので、遅らせるためにパスへ直接登録する。
+      mock.on(ORGANIZATIONS_PATH, async () => {
+        await answered;
+        await new Promise((r) => setTimeout(r, 300));
+        return { status: 200, body: DEFAULT_BODY };
+      });
+      // 一覧の応答をページの JS が処理し終えた印。モック側で返した時点ではまだ描画前なので、
+      // 一覧の res.json() が解決した後のマクロタスクで立てる（loadSites の続きはその前の
+      // マイクロタスクで同期的に走り終える）。
+      await page.addInitScript(() => {
+        const original = window.fetch.bind(window);
+        window.fetch = async (...args: Parameters<typeof fetch>) => {
+          const res = await original(...args);
+          const url = args[0] instanceof Request ? args[0].url : String(args[0]);
+          if (new URL(url).pathname === '/v1/account/organizations') {
+            const json = res.json.bind(res);
+            res.json = async () => {
+              try {
+                return await json();
+              } finally {
+                setTimeout(() => { (window as unknown as { __listHandled?: boolean }).__listHandled = true; }, 0);
+              }
+            };
+          }
+          return res;
+        };
+      });
+      mock.on(BILLING_PATH, () => {
+        billingAnswered();
+        return { status: 401, body: { error: 'invalid_token' } };
+      });
+
+      await page.goto('/mypage/');
+      await expect(page.locator('#login-view')).toBeVisible();
+      await page.waitForFunction(() => (window as unknown as { __listHandled?: boolean }).__listHandled === true);
+
+      await expect(page.locator('#login-view')).toBeVisible();
+      await expect(page.locator('#app-view')).toBeHidden();
+      await expect(page.locator('.client-item')).toHaveCount(0);
+      expect(await readSession(page, AT_KEY)).toBeNull();
+    });
+
+    test('アプリ名やサイトコードに HTML が含まれてもテキストとして描画する（XSS 回避）', async ({ page }) => {
+      stubDefaultList();
+      const body = billingBody();
+      const prodOrg = (body.estimate.organizations as Array<Record<string, unknown>>)[0];
+      prodOrg.code = '<img src=x onerror="window.__xssb1=1">';
+      prodOrg.clients = [
+        billingClient({ id: PROD_ID, client_id: 'prod-client-id', app_name: '<img src=x onerror="window.__xssb2=1">' }),
+      ];
+      mock.on(BILLING_PATH, { status: 200, body });
+
+      await page.goto('/mypage/');
+      await card(page).locator('.bill-detail summary').click();
+
+      await expect(card(page).locator('.bill-app').first()).toHaveText('<img src=x onerror="window.__xssb2=1">');
+      expect(await card(page).locator('img').count()).toBe(0);
+      expect(await page.evaluate(() => (window as unknown as { __xssb1?: number; __xssb2?: number }).__xssb1)).toBeUndefined();
+      expect(await page.evaluate(() => (window as unknown as { __xssb2?: number }).__xssb2)).toBeUndefined();
     });
   });
 });
