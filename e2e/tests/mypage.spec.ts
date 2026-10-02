@@ -2205,6 +2205,36 @@ test.describe('認証済', () => {
       expect(await readSession(page, AT_KEY)).toBeNull();
     });
 
+    test('課金が先に 401 で返ったら、遅れて成功した一覧でログイン前の画面に戻さない', async ({ page }) => {
+      // 一覧と課金は並行して取る。課金の 401 でログイン画面に戻した後に一覧の成功が届いても、
+      // 一覧を描き直してはいけない（トークンは消えているのに画面だけ残る）。
+      let billingAnswered!: () => void;
+      const answered = new Promise<void>((resolve) => { billingAnswered = resolve; });
+      let listAnswered = false;
+      // stubOrganizations の list は同期関数なので、遅らせるためにパスへ直接登録する。
+      mock.on(ORGANIZATIONS_PATH, async () => {
+        await answered;
+        await new Promise((r) => setTimeout(r, 300));
+        listAnswered = true;
+        return { status: 200, body: DEFAULT_BODY };
+      });
+      mock.on(BILLING_PATH, () => {
+        billingAnswered();
+        return { status: 401, body: { error: 'invalid_token' } };
+      });
+
+      await page.goto('/mypage/');
+      await expect(page.locator('#login-view')).toBeVisible();
+      await expect.poll(() => listAnswered).toBe(true);
+      // 一覧の応答をブラウザが処理し終えるまで待ってから確かめる。
+      await page.waitForTimeout(300);
+
+      await expect(page.locator('#login-view')).toBeVisible();
+      await expect(page.locator('#app-view')).toBeHidden();
+      await expect(page.locator('.client-item')).toHaveCount(0);
+      expect(await readSession(page, AT_KEY)).toBeNull();
+    });
+
     test('アプリ名やサイトコードに HTML が含まれてもテキストとして描画する（XSS 回避）', async ({ page }) => {
       stubDefaultList();
       const body = billingBody();

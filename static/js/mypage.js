@@ -825,7 +825,15 @@
     }
   }
 
+  /*
+   * 401 を受けてログイン画面に戻したか。初期表示は一覧と課金を並行して取るため、片方が先に
+   * 401 で戻した後にもう片方が成功で返ると、一覧を描き直してログアウト前の画面に戻ってしまう。
+   * 応答を待った後の描画はこれを見て打ち切る。
+   */
+  var loggedOut = false;
+
   function requireLogin() {
+    loggedOut = true;
     sessionStorage.removeItem(AT_KEY);
     hide(loading); hide(appView); show(loginView);
   }
@@ -1023,6 +1031,7 @@
    */
   async function loadSites() {
     var res = await authFetch('GET', '/v1/account/organizations');
+    if (loggedOut) return false;
     if (res.status === 401) { requireLogin(); return false; }
     if (!res.ok || !res.data) {
       hide(loading); show(appView);
@@ -1101,6 +1110,7 @@
     btn.textContent = '移動中…';
 
     var res = await authFetch('POST', path);
+    if (loggedOut) return;
     if (res.status === 401) { requireLogin(); return; }
 
     var url = res.ok && res.data && typeof res.data.url === 'string' ? res.data.url : '';
@@ -1266,6 +1276,7 @@
   async function loadBilling(outcome) {
     var path = BILLING_PATH + (outcome === 'setup_complete' ? '?refresh=1' : '');
     var res = await authFetch('GET', path);
+    if (loggedOut) return;
     if (res.status === 401) { requireLogin(); return; }
     if (res.status === 404) { hide(billingCard); return; }
     show(billingCard);
