@@ -8,6 +8,14 @@ on:
     # closed は PR プレビューの後片付け（preview-cleanup）用
     types: [opened, synchronize, reopened, closed]
 
+# 同じ PR の run は新しいものだけを残す（古い run は走行中でも取り消す）。job 単位の group だけだと、
+# 待機できるジョブは 1 件で後から来たものに置き換えられるため、クローズ時の preview-cleanup が
+# 古い run の preview に取り消され、redirect_uri が残りうる。PR のイベントはクローズが最後なので、
+# クローズの run が必ず残る。main への push は取り消さない（本番デプロイを途中で止めない）。
+concurrency:
+  group: deploy-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   # フロント（申込 / マイページ）の E2E。EcAuth API は page.route() でスタブするため
   # backend を必要とせず、このリポジトリ単体で完結して回る。
