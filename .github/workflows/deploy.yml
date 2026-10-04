@@ -129,7 +129,10 @@ jobs:
       PREVIEW_ORIGIN: https://pr-${{ github.event.pull_request.number }}.ecauth-website-stg.pages.dev
       STG_API_BASE_URL: https://stg-accounts.ec-auth.io
     steps:
+      # pull-requests: write のトークンを .git/config に残さない（後続に認証付きの Git 操作は無い）
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # export-env: false にして、値は必要なステップにだけ渡す
       - name: Load secrets from 1Password
@@ -181,8 +184,24 @@ jobs:
             exit 1
           fi
 
+      # クローズ直前に push された run は e2e を待つ間に closed の run（preview-cleanup）に追い越され、
+      # cleanup が DELETE した後に登録してしまう。preview と preview-cleanup は同じ concurrency group で
+      # 直列化しているので、この時点で PR がまだ open かを見直せば、後から来た登録を止められる。
+      - name: Check PR is still open
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          state=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq .state)
+          echo "state=${state}" >> "$GITHUB_OUTPUT"
+          if [ "$state" != "open" ]; then
+            echo "::notice::PR #${PR_NUMBER} は ${state} のため、redirect_uri の登録と PR コメントをスキップします"
+          fi
+
       # stg-accounts の管理コンソール Client に callback を登録する（登録済みなら 200、新規は 201）
       - name: Register redirect_uri
+        if: steps.pr.outputs.state == 'open'
         env:
           API_USER: ${{ steps.op.outputs.PREVIEW_API_CLIENT_ID }}
           API_PASSWORD: ${{ steps.op.outputs.PREVIEW_API_CLIENT_SECRET }}
@@ -197,6 +216,7 @@ jobs:
 
       # プレビュー URL を PR コメントに出す（マーカー付きの 1 件を書き換える）
       - name: Comment preview URL
+        if: steps.pr.outputs.state == 'open'
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
