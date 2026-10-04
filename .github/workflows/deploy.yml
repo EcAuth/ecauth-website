@@ -33,13 +33,13 @@ jobs:
 
       # playwright.config.ts の webServer が hugo server を起動するため、テスト側でも Hugo が要る。
       - name: Setup Hugo
-        uses: peaceiris/actions-hugo@75d2e84710de30f6ff7268e08f310b60ef14033f # v3.0.0
+        uses: peaceiris/actions-hugo@2752ce1d29631191ea3f27c23495fa06139a5b78 # v3.2.1
         with:
           hugo-version: 'latest'
           extended: true
 
       - name: Install pnpm
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
           package_json_file: e2e/package.json
 
@@ -83,7 +83,7 @@ jobs:
 
       - name: Load secrets from 1Password
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: 1password/load-secrets-action@e544b780808654ba8ceba5fb2fe2897103d92ff4 # v5.0.0
+        uses: 1password/load-secrets-action@70062d7a876d3eb6334754fa26efd2fbd90c32f2 # v5.0.1
         with:
           export-env: true
         env:
@@ -102,7 +102,7 @@ jobs:
 
       - name: Deploy to Cloudflare Pages
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
+        uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0 # v4.1.3
         with:
           apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
@@ -145,7 +145,7 @@ jobs:
       # export-env: false にして、値は必要なステップにだけ渡す
       - name: Load secrets from 1Password
         id: op
-        uses: 1password/load-secrets-action@e544b780808654ba8ceba5fb2fe2897103d92ff4 # v5.0.0
+        uses: 1password/load-secrets-action@70062d7a876d3eb6334754fa26efd2fbd90c32f2 # v5.0.1
         with:
           export-env: false
         env:
@@ -171,7 +171,7 @@ jobs:
 
       - name: Deploy to Cloudflare Pages (ecauth-website-stg)
         id: deploy
-        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
+        uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0 # v4.1.3
         with:
           apiToken: ${{ steps.op.outputs.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ steps.op.outputs.CLOUDFLARE_ACCOUNT_ID }}
@@ -275,7 +275,7 @@ jobs:
     steps:
       - name: Load secrets from 1Password
         id: op
-        uses: 1password/load-secrets-action@e544b780808654ba8ceba5fb2fe2897103d92ff4 # v5.0.0
+        uses: 1password/load-secrets-action@70062d7a876d3eb6334754fa26efd2fbd90c32f2 # v5.0.1
         with:
           export-env: false
         env:
