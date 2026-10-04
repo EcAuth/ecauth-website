@@ -58,6 +58,9 @@
     var q = new URLSearchParams();
     q.set('client_id', cfg.adminClientId || '');
     if (confirmedEmail) q.set('email', confirmedEmail);
+    // 登録後に戻るフロントのオリジン。EcAuth はテナントで許可された PR プレビュー
+    // （*.ecauth-website-stg.pages.dev）に一致するときだけ使い、それ以外は設定値に戻す（EcAuthDocs#159）。
+    q.set('frontend_origin', window.location.origin);
     // 登録トークンは URL フラグメントで渡す。フラグメントはサーバへ送信されないため、
     // アクセスログ / Azure Monitor(requests.url) / Referer にトークンが残らない。
     var frag = new URLSearchParams();
