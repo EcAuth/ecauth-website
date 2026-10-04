@@ -37,9 +37,26 @@ pnpm typecheck
 
 ## デプロイ
 
-- main ブランチへの push で GitHub Actions が Cloudflare Pages にデプロイ
-- PR 時はビルドのみ（デプロイしない）
+- main ブランチへの push で GitHub Actions が Cloudflare Pages（`ecauth-website`）にデプロイ
+- PR 時は本番へはデプロイせず、stg-accounts 向けのプレビューを出す（下記）
 - デプロイは E2E ジョブの成功が前提（`deploy.yml` の `needs: e2e`）
+
+### PR プレビュー（EcAuthDocs#159）
+
+PR ごとに stg-accounts（本番 App Service 上の Stripe test モードのテナント）向けにビルドし、
+stg 専用の Pages プロジェクト `ecauth-website-stg` へデプロイする（`deploy.yml` の `preview` ジョブ）。
+URL は `https://pr-<PR 番号>.ecauth-website-stg.pages.dev/` で、PR コメントに出る。
+
+- `apiBaseUrl` / `adminClientId` / `authRedirectUri` を `HUGO_PARAMS_*` で stg-accounts 向けに上書きする。
+  `authRedirectUri` をビルドに焼き込むため、ブランチエイリアスはブランチ名ではなく PR 番号（`--branch=pr-<番号>`）から作る
+- stg-accounts は `https://*.ecauth-website-stg.pages.dev` をパターン許可している（CORS・確認 URL・マジックリンク・
+  課金とパスキーページの戻り先）。パスキーページへの遷移には `frontend_origin`（自身のオリジン）を付ける
+- `redirect_uri` は完全一致のまま。デプロイ後に EcAuth の `PUT /v1/preview/redirect-uris` で
+  `{エイリアス}/auth/callback` を登録し、PR クローズ時に `preview-cleanup` が削除する。
+  そのためログインはエイリアスの URL からのみ通る（デプロイ固有の `<hash>.` URL では通らない）
+- シークレットは 1Password から `export-env: false` で読む（Cloudflare・stg の client_id・登録 API の資格情報
+  `ecauth-stg-preview-redirect-api`）。fork と Dependabot の PR では skip する
+- Pages のデプロイ自体は消さず、Pages の保持に任せる
 
 ## ディレクトリ構成
 

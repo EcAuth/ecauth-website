@@ -10,6 +10,7 @@ import {
   REDIRECT_URI,
   RecordedRequest,
   SECRET_MASK,
+  SITE_BASE,
   STATE_KEY,
   VERIFIER_KEY,
   authorizationOf,
@@ -242,6 +243,7 @@ test.describe('未認証', () => {
     expect(url.searchParams.get('redirect_uri')).toBe(REDIRECT_URI);
     expect(url.searchParams.get('response_type')).toBe('code');
     expect(url.searchParams.get('code_challenge_method')).toBe('S256');
+    expect(url.searchParams.get('frontend_origin')).toBe(SITE_BASE);
 
     // sessionStorage は ec-auth.io オリジンに紐づくため、同じタブで元のオリジンへ戻ってから読む。
     await page.goto('/mypage/');

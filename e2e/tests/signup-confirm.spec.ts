@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { ADMIN_CLIENT_ID, API_BASE, ApiMock, installApiMock, stubAccountsPages } from './helpers/mock';
+import { ADMIN_CLIENT_ID, API_BASE, ApiMock, SITE_BASE, installApiMock, stubAccountsPages } from './helpers/mock';
 
 /**
  * 申込確認（/signup/confirm/?token= → POST {apiBaseUrl}/api/signup/confirm）。
@@ -84,6 +84,7 @@ test('パスキー登録は accounts オリジンへ遷移し、登録トーク�
   expect(Object.fromEntries(url.searchParams)).toEqual({
     client_id: ADMIN_CLIENT_ID,
     email: 'user@example.com',
+    frontend_origin: SITE_BASE,
   });
 
   // 登録トークンはフラグメントにのみ載る（サーバへ送信されず、アクセスログ / Referer に残らない）。

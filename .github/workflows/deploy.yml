@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+    # closed は PR プレビューの後片付け（preview-cleanup）用
+    types: [opened, synchronize, reopened, closed]
 
 jobs:
   # フロント（申込 / マイページ）の E2E。EcAuth API は page.route() でスタブするため
@@ -13,6 +15,8 @@ jobs:
   # E2ETests/tests/specs/website_signup_flow.spec.ts（フル結合）が担当する。
   e2e:
     name: E2E (frontend)
+    # PR クローズ時は後片付けだけを行う（build-and-deploy / preview も needs で連鎖して skip される）
+    if: github.event.action != 'closed'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -96,3 +100,182 @@ jobs:
           accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
           packageManager: npm
           command: pages deploy public --project-name=ecauth-website
+
+  # PR ごとに stg-accounts（本番 App Service 上の Stripe test モードのテナント）向けにビルドし、
+  # stg 専用の Pages プロジェクト ecauth-website-stg へプレビューデプロイする（EcAuthDocs#159）。
+  # stg-accounts は *.ecauth-website-stg.pages.dev をパターンで許可しているので、プレビューから
+  # 申込 → マイページ → お支払いを実 API で通せる。redirect_uri だけは完全一致のため、
+  # ブランチエイリアスの /auth/callback を PR ごとに登録し、クローズ時に preview-cleanup で削除する。
+  preview:
+    name: Preview (stg-accounts)
+    needs: e2e
+    # fork の PR と Dependabot の PR にはシークレットが渡らないので skip する
+    if: >-
+      github.event_name == 'pull_request'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && github.event.pull_request.user.login != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    # 同じ PR の登録・削除が入れ違わないよう PR 単位で直列化する（preview-cleanup と同じ group）
+    concurrency:
+      group: preview-pr-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      # ブランチエイリアスは PR 番号から作る。authRedirectUri としてビルドに焼き込むため
+      # デプロイ前に確定している必要があり、ブランチ名をそのまま使うと Cloudflare の変換規則に依存する。
+      PREVIEW_BRANCH: pr-${{ github.event.pull_request.number }}
+      PREVIEW_ORIGIN: https://pr-${{ github.event.pull_request.number }}.ecauth-website-stg.pages.dev
+      STG_API_BASE_URL: https://stg-accounts.ec-auth.io
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # export-env: false にして、値は必要なステップにだけ渡す
+      - name: Load secrets from 1Password
+        id: op
+        uses: 1password/load-secrets-action@e544b780808654ba8ceba5fb2fe2897103d92ff4 # v5.0.0
+        with:
+          export-env: false
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          CLOUDFLARE_API_TOKEN: op://EcAuth/cloudflare-credentials/CLOUDFLARE_API_TOKEN
+          CLOUDFLARE_ACCOUNT_ID: op://EcAuth/cloudflare-credentials/CLOUDFLARE_ACCOUNT_ID
+          STG_ADMIN_CLIENT_ID: op://EcAuth/ecauth-prod-app/add more/stg_accounts_client_id
+          PREVIEW_API_CLIENT_ID: op://EcAuth/ecauth-stg-preview-redirect-api/username
+          PREVIEW_API_CLIENT_SECRET: op://EcAuth/ecauth-stg-preview-redirect-api/password
+
+      - name: Setup Hugo
+        uses: peaceiris/actions-hugo@2752ce1d29631191ea3f27c23495fa06139a5b78 # v3.2.1
+        with:
+          hugo-version: 'latest'
+          extended: true
+
+      - name: Build (stg-accounts)
+        env:
+          HUGO_PARAMS_APIBASEURL: ${{ env.STG_API_BASE_URL }}
+          HUGO_PARAMS_ADMINCLIENTID: ${{ steps.op.outputs.STG_ADMIN_CLIENT_ID }}
+          HUGO_PARAMS_AUTHREDIRECTURI: ${{ env.PREVIEW_ORIGIN }}/auth/callback
+        run: hugo --minify --baseURL "${PREVIEW_ORIGIN}/"
+
+      - name: Deploy to Cloudflare Pages (ecauth-website-stg)
+        id: deploy
+        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
+        with:
+          apiToken: ${{ steps.op.outputs.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ steps.op.outputs.CLOUDFLARE_ACCOUNT_ID }}
+          packageManager: npm
+          command: >-
+            pages deploy public
+            --project-name=ecauth-website-stg
+            --branch=${{ env.PREVIEW_BRANCH }}
+            --commit-hash=${{ github.event.pull_request.head.sha }}
+
+      # ビルドに焼き込んだ authRedirectUri と実際のエイリアスがずれていればログインできないので止める
+      - name: Verify deployment alias
+        env:
+          ALIAS_URL: ${{ steps.deploy.outputs.pages-deployment-alias-url }}
+        run: |
+          if [ "${ALIAS_URL%/}" != "$PREVIEW_ORIGIN" ]; then
+            echo "::error::デプロイのエイリアス (${ALIAS_URL}) が想定 (${PREVIEW_ORIGIN}) と一致しません"
+            exit 1
+          fi
+
+      # stg-accounts の管理コンソール Client に callback を登録する（登録済みなら 200、新規は 201）
+      - name: Register redirect_uri
+        env:
+          API_USER: ${{ steps.op.outputs.PREVIEW_API_CLIENT_ID }}
+          API_PASSWORD: ${{ steps.op.outputs.PREVIEW_API_CLIENT_SECRET }}
+        run: |
+          # 資格情報はコマンドライン引数に載せず、curl の設定を標準入力で渡す
+          status=$(printf 'user = "%s:%s"\n' "$API_USER" "$API_PASSWORD" | curl -K - -sS \
+            -o /tmp/register.json -w '%{http_code}' -X PUT --get \
+            --data-urlencode "uri=${PREVIEW_ORIGIN}/auth/callback" \
+            "${STG_API_BASE_URL}/v1/preview/redirect-uris")
+          echo "HTTP ${status}"; cat /tmp/register.json; echo
+          case "$status" in 200|201) ;; *) exit 1 ;; esac
+
+      # プレビュー URL を PR コメントに出す（マーカー付きの 1 件を書き換える）
+      - name: Comment preview URL
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
+        run: |
+          marker='<!-- ecauth-website-stg-preview -->'
+          body=$(cat <<EOF
+          ${marker}
+          ### プレビュー（stg-accounts）
+
+          | | |
+          |---|---|
+          | URL | ${PREVIEW_ORIGIN}/ |
+          | API | ${STG_API_BASE_URL}（Stripe test モード） |
+          | コミット | ${HEAD_SHA} |
+          | このデプロイ固有の URL | ${DEPLOYMENT_URL} |
+
+          ログイン（パスキー / OAuth2 callback）は上の URL（ブランチエイリアス）からのみ通ります。デプロイ固有の URL では redirect_uri が一致しません。
+          EOF
+          )
+          id=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" --paginate \
+            --jq "[.[] | select(.user.login == \"github-actions[bot]\" and (.body | contains(\"${marker}\")))][0].id // empty")
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${id}" -f body="$body" >/dev/null
+          else
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" -f body="$body" >/dev/null
+          fi
+
+  # PR クローズ（マージ含む）時に、preview が登録した redirect_uri を削除する。
+  # Pages のデプロイ自体は消さず、Pages の保持に任せる。
+  preview-cleanup:
+    name: Preview cleanup
+    if: >-
+      github.event_name == 'pull_request'
+      && github.event.action == 'closed'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && github.event.pull_request.user.login != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: preview-pr-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    permissions:
+      pull-requests: write
+    env:
+      PREVIEW_ORIGIN: https://pr-${{ github.event.pull_request.number }}.ecauth-website-stg.pages.dev
+      STG_API_BASE_URL: https://stg-accounts.ec-auth.io
+    steps:
+      - name: Load secrets from 1Password
+        id: op
+        uses: 1password/load-secrets-action@e544b780808654ba8ceba5fb2fe2897103d92ff4 # v5.0.0
+        with:
+          export-env: false
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          PREVIEW_API_CLIENT_ID: op://EcAuth/ecauth-stg-preview-redirect-api/username
+          PREVIEW_API_CLIENT_SECRET: op://EcAuth/ecauth-stg-preview-redirect-api/password
+
+      # 未登録でも 204 が返る（再実行しても安全）
+      - name: Delete redirect_uri
+        env:
+          API_USER: ${{ steps.op.outputs.PREVIEW_API_CLIENT_ID }}
+          API_PASSWORD: ${{ steps.op.outputs.PREVIEW_API_CLIENT_SECRET }}
+        run: |
+          status=$(printf 'user = "%s:%s"\n' "$API_USER" "$API_PASSWORD" | curl -K - -sS \
+            -o /tmp/delete.json -w '%{http_code}' -X DELETE --get \
+            --data-urlencode "uri=${PREVIEW_ORIGIN}/auth/callback" \
+            "${STG_API_BASE_URL}/v1/preview/redirect-uris")
+          echo "HTTP ${status}"; cat /tmp/delete.json; echo
+          [ "$status" = "204" ]
+
+      - name: Update preview comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          marker='<!-- ecauth-website-stg-preview -->'
+          id=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" --paginate \
+            --jq "[.[] | select(.user.login == \"github-actions[bot]\" and (.body | contains(\"${marker}\")))][0].id // empty")
+          [ -n "$id" ] || exit 0
+          body=$(printf '%s\n### プレビュー（stg-accounts）\n\nPR がクローズされたため、%s/auth/callback を redirect_uri から削除しました。このプレビューからはログインできません。\n' "$marker" "$PREVIEW_ORIGIN")
+          gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${id}" -f body="$body" >/dev/null

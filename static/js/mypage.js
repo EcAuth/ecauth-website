@@ -77,7 +77,10 @@
         code_challenge: pkce.challenge,
         code_challenge_method: 'S256',
         // CSRF / 認可コード注入対策。callback で保存値と一致検証する。
-        state: state
+        state: state,
+        // 認証ページの戻り先リンク用のフロントのオリジン。EcAuth はテナントで許可された PR プレビュー
+        // （*.ecauth-website-stg.pages.dev）に一致するときだけ使い、それ以外は設定値に戻す（EcAuthDocs#159）。
+        frontend_origin: window.location.origin
       });
       // accounts オリジンのパスキー認証ページ（RP ID=accounts）へ遷移
       window.location.href = apiBase() + '/passkey/authenticate?' + q.toString();
